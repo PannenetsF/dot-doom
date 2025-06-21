@@ -1,0 +1,7 @@
+#+TITLE: Doom Config 
+
+* Install 
+
+#+begin_src
+brew install emacs-plus --with-modern-black-dragon-icon --with-mailutils --with-imagemagick
+#+end_src
