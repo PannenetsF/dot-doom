@@ -21,7 +21,7 @@
 ;; See 'C-h v doom-font' for documentation and more examples of what they
 ;; accept. For example:
 ;;
-(setq doom-font (font-spec :family "JetBrainsMono Nerd Font Mono" :size 18 ))
+(setq doom-font (font-spec :family "JetBrainsMono Nerd Font" :size 18 ))
 
 (defun private-cjk-font()
 (dolist (charset '(kana han cjk-misc symbol bopomofo))
