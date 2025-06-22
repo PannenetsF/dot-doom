@@ -60,3 +60,9 @@
 
 (package! org-modern
   :recipe (:host github :repo "minad/org-modern"))
+
+(package! all-the-icons
+  :recipe (:host github :repo "domtronn/all-the-icons.el" )) ;; :files ("*.el")))
+
+(package! nerd-icons
+  :recipe (:host github :repo "rainstormstudio/nerd-icons.el")) ;; :files ("*.el")))
