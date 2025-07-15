@@ -113,17 +113,60 @@
   (require 'deferred)
   (require 'org-zotxt-noter))
 
+;; setup org-roam-ui
+(use-package! websocket
+  :after org-roam)
+
+(use-package! org-roam-ui
+  :after org-roam ;; or :after org
+  ;;         normally we'd recommend hooking orui after org-roam, but since org-roam does not have
+  ;;         a hookable mode anymore, you're advised to pick something yourself
+  ;;         if you don't care about startup time, use
+  ;;         :hook (after-init . org-roam-ui-mode)
+  :config
+  (setq org-roam-ui-sync-theme t
+        org-roam-ui-follow t
+        org-roam-ui-update-on-save t
+        org-roam-ui-open-on-start t
+        )
+  )
+
+
 (after! org
-  (setq org-checkbox-hierarchical-statistics t)
-  (setq org-agenda-todo-list-sublevels t)
-  (setq org-todo-keywords '((sequence "TODO(t)" "PEND(p)" "WAIT(w)" "|" "DONE(d)" "CANCELLED(c)")))
+  (setq org-checkbox-hierarchical-statistics t
+        org-agenda-todo-list-sublevels t
+        org-todo-keywords '((sequence "TODO(t)" "PEND(p)" "WAIT(w)" "|" "DONE(d)" "CANCELLED(c)"))
+        org-capture-templates
+        '(
+          ("t" "Quick To-do" entry
+           (file+headline +org-capture-notes-file "TO-DO Inbox")
+           "* TODO %?\n%i\n%a" :prepend t)
+          ("w" "Weekly workbook" entry
+           (file+olp+datetree +org-capture-notes-file "Workbook")
+           "* %?\n" :tree-type week :prepend t)
+          ("p" "Project note" entry
+           (file+headline +org-capture-notes-file "Projects")
+           "* TODO %^{ProjectName}\n%u\n%a\n")
+          ("i" "Quick Thought" entry
+           (file+olp +org-capture-notes-file "Ideas")
+           "* %?\n"))
+        org-agenda-files (directory-files-recursively org-directory "\\.org$")
+        )
 
   (map! :leader
         (:prefix-map ("X" . "Org")
-         :desc "org capture" "c" #'org-capture
-         :desc "org refresh statistics of current line" "r" #'org-update-statistics-cookies
+         :desc "org refresh statistics of current line" "R" #'org-update-statistics-cookies
          :desc "org cycle todo state" "t" #'org-todo
-         :desc "org toggle checkbox" "x" #'org-toggle-checkbox))
+         :desc "org toggle checkbox" "x" #'org-toggle-checkbox
+         :desc "org roam refile" "r" #'org-roam-refile
+         :desc "org roam insert" "i" #'org-roam-node-insert
+         :desc "org roam capture" "c" #'org-roam-capture
+         :desc "org roam find" "f" #'org-roam-node-find
+         :desc "org roam ui toggle" "u" #'org-roam-ui-mode
+         :desc "org roam ui follow toggle" "F" #'org-roam-ui-follow-mode
+         :desc "org capture" "C" #'org-capture
+         )
+        )
   )
 
 ;; 5. disable quit confirmation

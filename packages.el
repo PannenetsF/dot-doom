@@ -66,3 +66,7 @@
 
 (package! nerd-icons
   :recipe (:host github :repo "rainstormstudio/nerd-icons.el")) ;; :files ("*.el")))
+
+;; for org-roam visualization
+(unpin! org-roam)
+(package! org-roam-ui)
