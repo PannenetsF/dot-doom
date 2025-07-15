@@ -24,7 +24,7 @@
 (setq doom-font (font-spec :family "JetBrainsMono Nerd Font" :size 18 ))
 
 (defun private-cjk-font()
-(dolist (charset '(kana han cjk-misc symbol bopomofo))
+  (dolist (charset '(kana han cjk-misc symbol bopomofo))
     (set-fontset-font t charset (font-spec :family "LXGW WenKai Mono"))))
 
 (add-hook 'after-setting-font-hook #'private-cjk-font)
@@ -149,3 +149,7 @@
    '(:application tramp :protocol "ssh")
    'remote-direct-async-process)
   )
+
+;; vim-like keybindings
+(map! :leader
+      :desc "Open File Tree" "e" #'+treemacs/toggle)
