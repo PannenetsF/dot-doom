@@ -113,10 +113,23 @@
   (require 'deferred)
   (require 'org-zotxt-noter))
 
-;; 4. disable quit confirmation
+(after! org
+  (setq org-checkbox-hierarchical-statistics t)
+  (setq org-agenda-todo-list-sublevels t)
+  (setq org-todo-keywords '((sequence "TODO(t)" "PEND(p)" "WAIT(w)" "|" "DONE(d)" "CANCELLED(c)")))
+
+  (map! :leader
+        (:prefix-map ("X" . "Org")
+         :desc "org capture" "c" #'org-capture
+         :desc "org refresh statistics of current line" "r" #'org-update-statistics-cookies
+         :desc "org cycle todo state" "t" #'org-todo
+         :desc "org toggle checkbox" "x" #'org-toggle-checkbox))
+  )
+
+;; 5. disable quit confirmation
 (setq confirm-kill-emacs nil)
 
-;; 5. accelerate tramp 
+;; 6. accelerate tramp
 (use-package tramp
   :config
   (setq tramp-auto-save-directory "/tmp/tramp-autosaves/"
