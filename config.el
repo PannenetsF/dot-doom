@@ -91,8 +91,9 @@
 
 ;; 3. disable the splash 
 ;; https://www.cleanpng.com/png-spacemacs-computer-software-command-line-interface-3947037/
-(setq fancy-splash-image (concat doom-private-dir "dark32x32.png"))
+(setq fancy-splash-image (concat doom-user-dir "Nuvola_apps_emacs_vector.svg"))
 
+;; 4. setup org-mode
 (use-package! org-modern
   :after org
   :init 
