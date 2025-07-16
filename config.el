@@ -111,7 +111,99 @@
   ;; code here will run immediately
   (require 'request)
   (require 'deferred)
-  (require 'org-zotxt-noter))
+  (require 'org-zotxt-noter)
+  (require 'org-noter)
+  (require 'org-zotxt)
+  (setq org-zotxt-notes-directory (expand-file-name "zotero/" org-roam-directory)
+   org-zotxt-link-description-style :citation 
+   zotxt-default-bibliography-style "ieee")
+
+  (defun jump-to-zotxt-note-by-search ()
+    "Go to Zotero note via searching. Create the note file if it does not exist"
+    (interactive)
+    (deferred:$
+     ;; step1: search for Zotero items
+     (zotxt-search-deferred :title-creator-year)
+     (deferred:nextc it
+                     (lambda (items)
+                       (message "Zotxt step1")
+                       (when (null items)
+                         (error "No Zotero items found."))
+                       (car items)))
+
+     ;; step2: get the full item details
+     (deferred:nextc it
+                     (lambda (item)
+                       (message "Zotxt step2")
+                       (zotxt-get-item-deferred item :full)))
+
+     ;; step3: generate note file path and pass context
+     (deferred:nextc it
+                     (lambda (full-item)
+                       (message "Zotxt step3")
+                       (let* ((item-key (plist-get full-item :key))
+                              (note-directory org-zotxt-notes-directory)
+                              (note-file (concat note-directory item-key ".org")))
+                         (make-directory note-directory t)
+                         (cons full-item note-file))))
+
+     ;; step4: create or open the note file
+     (deferred:nextc it
+                     (lambda (full-item-note-file)
+                       (message "Zotxt step4")
+                       (let* (
+                              (full-item (car full-item-note-file))
+                              (note-file (cdr full-item-note-file))
+                              (json-object-type 'hash-table)
+                              (json-array-type 'list)
+                              (json-key-type 'string)
+                              (json-data (json-read-from-string (plist-get full-item :full)))
+                              (item-data (if (listp json-data) (car json-data) json-data))
+                              (item-title (gethash "title" item-data))
+                              )
+                         (make-directory org-zotxt-notes-directory t)
+                         (if (file-exists-p note-file)
+                             (find-file note-file)
+                           (with-temp-file note-file
+                             (insert (format "#+TITLE: %s\n" item-title))
+                             (insert (format "#+DATE: %s\n" (format-time-string "%Y-%m-%d %H:%M")))
+                             (insert "* Meta Info\n")
+                             ))
+                         (find-file note-file)
+                         full-item
+                         )
+                       ))
+
+     ;; step5: get the properties and paths
+     (deferred:nextc it
+                     (lambda (item)
+                       (message "Zotxt step5.1")
+                       (zotxt-get-item-deferred item :paths)))
+     (deferred:nextc it
+                     (lambda (item)
+                       (message "Zotxt step5.2")
+                       (message (prin1-to-string item))
+                       (org-zotxt-get-item-link-text-deferred item)))
+     (deferred:nextc it
+                     (lambda (resp)
+                       (message "Zotxt step5.3")
+                       (let ((path (org-zotxt-choose-path (cdr (assq 'paths (plist-get resp :paths))))))
+                         (beginning-of-buffer)
+                         (org-entry-put (point) org-zotxt-noter-zotero-link (org-zotxt-make-item-link resp))
+                         (org-entry-put (point) org-noter-property-doc-file path)
+                         (save-buffer)
+                         )
+                       ))
+
+
+     ;; step6: error handling
+     (deferred:error it
+                     (lambda (err)
+                       (message "Zotxt Failed for : %s" (error-message-string err))
+                       (signal 'user-error (list "Canceled"))))
+     ))
+
+  )
 
 ;; setup org-roam-ui
 (use-package! websocket
