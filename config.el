@@ -115,8 +115,12 @@
   (require 'org-noter)
   (require 'org-zotxt)
   (setq org-zotxt-notes-directory (expand-file-name "zotero/" org-roam-directory)
-   org-zotxt-link-description-style :citation 
-   zotxt-default-bibliography-style "ieee")
+        org-zotxt-link-description-style :citation
+        zotxt-default-bibliography-style "ieee")
+
+
+  (defvar org-roam-zotero-note--file-name ""
+    "The name of the zotero note file to be created or opened.")
 
   (defun jump-to-zotxt-note-by-search ()
     "Go to Zotero note via searching. Create the note file if it does not exist"
@@ -126,7 +130,6 @@
      (zotxt-search-deferred :title-creator-year)
      (deferred:nextc it
                      (lambda (items)
-                       (message "Zotxt step1")
                        (when (null items)
                          (error "No Zotero items found."))
                        (car items)))
@@ -134,13 +137,11 @@
      ;; step2: get the full item details
      (deferred:nextc it
                      (lambda (item)
-                       (message "Zotxt step2")
                        (zotxt-get-item-deferred item :full)))
 
      ;; step3: generate note file path and pass context
      (deferred:nextc it
                      (lambda (full-item)
-                       (message "Zotxt step3")
                        (let* ((item-key (plist-get full-item :key))
                               (note-directory org-zotxt-notes-directory)
                               (note-file (concat note-directory item-key ".org")))
@@ -150,7 +151,6 @@
      ;; step4: create or open the note file
      (deferred:nextc it
                      (lambda (full-item-note-file)
-                       (message "Zotxt step4")
                        (let* (
                               (full-item (car full-item-note-file))
                               (note-file (cdr full-item-note-file))
@@ -165,11 +165,12 @@
                          (if (file-exists-p note-file)
                              (find-file note-file)
                            (with-temp-file note-file
-                             (insert (format "#+TITLE: %s\n" item-title))
+                             (insert (format "#+TITLE: %s\n" (concat "PAPER: " item-title)))
                              (insert (format "#+DATE: %s\n" (format-time-string "%Y-%m-%d %H:%M")))
                              (insert "* Meta Info\n")
                              ))
                          (find-file note-file)
+                         (setq org-roam-zotero-note--file-name note-file)
                          full-item
                          )
                        ))
@@ -177,21 +178,24 @@
      ;; step5: get the properties and paths
      (deferred:nextc it
                      (lambda (item)
-                       (message "Zotxt step5.1")
                        (zotxt-get-item-deferred item :paths)))
      (deferred:nextc it
                      (lambda (item)
-                       (message "Zotxt step5.2")
-                       (message (prin1-to-string item))
+                       ;; (message (prin1-to-string item))
                        (org-zotxt-get-item-link-text-deferred item)))
      (deferred:nextc it
                      (lambda (resp)
-                       (message "Zotxt step5.3")
-                       (let ((path (org-zotxt-choose-path (cdr (assq 'paths (plist-get resp :paths))))))
-                         (beginning-of-buffer)
-                         (org-entry-put (point) org-zotxt-noter-zotero-link (org-zotxt-make-item-link resp))
-                         (org-entry-put (point) org-noter-property-doc-file path)
-                         (save-buffer)
+                       (find-file org-roam-zotero-note--file-name)
+                       (goto-char (point-min))
+                       (if-let ((id (org-entry-get (point) "ID")))
+                           (message "id found in the DB, jump to it directly")
+                         (let ((path (org-zotxt-choose-path (cdr (assq 'paths (plist-get resp :paths))))))
+                           (org-entry-put (point) "ID" (org-id-new))
+                           (org-entry-put (point) org-zotxt-noter-zotero-link (org-zotxt-make-item-link resp))
+                           (org-entry-put (point) org-noter-property-doc-file path)
+                           (save-buffer)
+                           (message "Zotxt Linking note to Zotero item %s" (plist-get resp :key))
+                           )
                          )
                        ))
 
@@ -200,7 +204,8 @@
      (deferred:error it
                      (lambda (err)
                        (message "Zotxt Failed for : %s" (error-message-string err))
-                       (signal 'user-error (list "Canceled"))))
+                       ;; (signal 'user-error (list "Canceled"))
+                       ))
      ))
 
 
@@ -262,6 +267,7 @@
          :desc "org roam refile" "r" #'org-roam-refile
          :desc "org roam insert" "i" #'org-roam-node-insert
          :desc "org roam capture" "c" #'org-roam-capture
+         :desc "org roam capture paper" "p" #'jump-to-zotxt-note-by-search
          :desc "org roam find" "f" #'org-roam-node-find
          :desc "org roam ui toggle" "u" #'org-roam-ui-mode
          :desc "org roam ui follow toggle" "F" #'org-roam-ui-follow-mode
