@@ -233,8 +233,16 @@
   (setq org-roam-ui-sync-theme t
         org-roam-ui-follow t
         org-roam-ui-update-on-save t
-        org-roam-ui-open-on-start t
-        )
+        org-roam-ui-open-on-start t)
+
+  (setq org-roam-dailies-directory "weekbook/")
+
+  (setq org-roam-dailies-capture-templates
+      '(("d" "default" entry "** %?" :if-new
+        (file+head+olp "%<%Y-week%g>.org" "#+title: %<%Y-week%g>\n"
+                       ("%<%A/week%g %Y-%m-%d>"))
+        :unnarrowed t
+        )))
   )
 
 
@@ -267,6 +275,7 @@
          :desc "org roam refile" "r" #'org-roam-refile
          :desc "org roam insert" "i" #'org-roam-node-insert
          :desc "org roam capture" "c" #'org-roam-capture
+         :desc "org roam weekbook" "w" #'org-roam-dailies-capture-today
          :desc "org roam capture paper" "p" #'jump-to-zotxt-note-by-search
          :desc "org roam find" "f" #'org-roam-node-find
          :desc "org roam ui toggle" "u" #'org-roam-ui-mode
