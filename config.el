@@ -238,11 +238,26 @@
   (setq org-roam-dailies-directory "weekbook/")
 
   (setq org-roam-dailies-capture-templates
-      '(("d" "default" entry "** %?" :if-new
-        (file+head+olp "%<%Y-week%g>.org" "#+title: %<%Y-week%g>\n"
-                       ("%<%A/week%g %Y-%m-%d>"))
-        :unnarrowed t
-        )))
+        '(
+          ("d" "Weekbook" entry "%?" :if-new
+           (file+head+olp "%<%Y-week%g>.org" "#+title: %<%Y-week%g>\n" ("Weekbook" "%<%A/week%g %Y-%m-%d>"))
+           :unnarrowed t
+           )
+          ("i" "Ideas" entry "** %?" :if-new
+           (file+head+olp "%<%Y-week%g>.org" "#+title: %<%Y-week%g>\n" ("Ideas"))
+           :unnarrowed t
+           )
+          )
+        org-roam-capture-templates
+        '(
+          ("d" "Normal Notes" plain "%?" :target
+           (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n") :unnarrowed t)
+
+          ("t" "Quick To-do" plain "no %?" :if-new
+           (file+head+olp "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n" ("TODOs" "%<%Y%m%d%H%M%S>"))
+           :unnarrowed t)
+          )
+        )
   )
 
 
