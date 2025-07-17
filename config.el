@@ -288,3 +288,12 @@
 ;; vim-like keybindings
 (map! :leader
       :desc "Open File Tree" "e" #'+treemacs/toggle)
+
+;; for copilot
+(use-package! copilot
+  :hook (prog-mode . copilot-mode)
+  :bind (:map copilot-completion-map
+              ("<tab>" . 'copilot-accept-completion)
+              ("TAB" . 'copilot-accept-completion)
+              ("C-TAB" . 'copilot-accept-completion-by-word)
+              ("C-<tab>" . 'copilot-accept-completion-by-word)))
