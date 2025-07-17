@@ -203,6 +203,15 @@
                        (signal 'user-error (list "Canceled"))))
      ))
 
+
+  (defun org-zotero-open-via-macos (path _)
+    (call-process "open" nil nil nil (concat "zotero:" path)))
+
+  (add-hook 'org-zotxt-mode-hook
+            (lambda ()
+              (org-link-set-parameters "zotero" :follow #'org-zotero-open-via-macos :export #'org-zotero-export)
+              ))
+
   )
 
 ;; setup org-roam-ui
