@@ -42,7 +42,7 @@
 
 ;; This determines the style of line numbers in effect. If set to `nil', line
 ;; numbers are disabled. For relative line numbers, set this to `relative'.
-(setq display-line-numbers-type t)
+(setq display-line-numbers-type 'relative)
 
 ;; If you use `org' and don't want your org files in the default location below,
 ;; change `org-directory'. It must be set before org loads!
@@ -332,7 +332,13 @@
 (use-package! copilot
   :hook (prog-mode . copilot-mode)
   :bind (:map copilot-completion-map
-              ("<tab>" . 'copilot-accept-completion)
-              ("TAB" . 'copilot-accept-completion)
-              ("C-TAB" . 'copilot-accept-completion-by-word)
-              ("C-<tab>" . 'copilot-accept-completion-by-word)))
+              ("C-E" . 'copilot-accept-completion)
+              ("C-e" . 'copilot-accept-completion)))
+
+;; for auto-save
+(setq auto-save-visited-interval 5)
+(auto-save-visited-mode +1)
+
+;; for dired
+(map! :map dirvish-mode-map
+      :n "+" #'dired-create-empty-file)
