@@ -115,7 +115,7 @@
   (require 'org-noter)
   (require 'org-zotxt)
   (setq org-zotxt-notes-directory (expand-file-name "zotero/" org-roam-directory)
-        org-zotxt-link-description-style :citation
+        org-zotxt-link-description-style :citekey
         zotxt-default-bibliography-style "ieee")
 
 
@@ -189,12 +189,15 @@
                        (goto-char (point-min))
                        (if-let ((id (org-entry-get (point) "ID")))
                            (message "id found in the DB, jump to it directly")
-                         (let ((path (org-zotxt-choose-path (cdr (assq 'paths (plist-get resp :paths))))))
+                         (progn
                            (org-entry-put (point) "ID" (org-id-new))
                            (org-entry-put (point) org-zotxt-noter-zotero-link (org-zotxt-make-item-link resp))
-                           (org-entry-put (point) org-noter-property-doc-file path)
-                           (save-buffer)
-                           (message "Zotxt Linking note to Zotero item %s" (plist-get resp :key))
+                           (org-roam-db-sync)
+                           (let ((path (org-zotxt-choose-path (cdr (assq 'paths (plist-get resp :paths))))))
+                             (org-entry-put (point) org-noter-property-doc-file path)
+                             (save-buffer)
+                             (message "Zotxt Linking note to Zotero item %s" (plist-get resp :key))
+                             )
                            )
                          )
                        ))
@@ -212,9 +215,58 @@
   (defun org-zotero-open-via-macos (path _)
     (call-process "open" nil nil nil (concat "zotero:" path)))
 
+
+  (defun extract-zotero-link-from-path (zotero-link-with-desc)
+    ;; "[[zotero://select/items/1_BYJ73MHG][@llama3-grattafioriLlama3Herd2024]]"
+    ;; "[[zotero://select/items/1_BYJ73MHG]]"
+    (if (string-match "\\(zotero://[^]]+\\)" zotero-link-with-desc)
+        (match-string 1 zotero-link-with-desc)
+      nil)
+    )
+
+
+  (defun extract-zotero-desc-from-path (zotero-link-with-desc)
+    "Extract description from Zotero link.
+Example:
+\"[[zotero://select/items/1_BYJ73MHG][@llama3-grattafioriLlama3Herd2024]]\"
+  -> \"@llama3-grattafioriLlama3Herd2024\"
+If no description exists (e.g. \"[[zotero://select/items/1_BYJ73MHG]]\"),
+return nil."
+    (when (string-match "\\[\\[zotero://.*\\]\\[\\(.*\\)\\]\\]" zotero-link-with-desc)
+      (match-string 1 zotero-link-with-desc)))
+
+
+  (defun org-id-of-zotero-note-export-maybe (path desc format)
+    "Export function for org-id links that may contain Zotero links."
+    (let ((file-name (car (org-roam-id-find path))))
+      (if (and file-name (file-exists-p file-name))
+          (with-current-buffer (find-file-noselect file-name)
+            (save-excursion
+              (goto-char (point-min))
+              (let* (
+                     (zotero-link-prop (org-entry-get (point) org-zotxt-noter-zotero-link))
+                     (zotero-link (extract-zotero-link-from-path zotero-link-prop))
+                     (zotero-desc (extract-zotero-desc-from-path zotero-link-prop))
+                     )
+                (if zotero-link
+                    (progn
+                      (org-zotxt--link-export (substring zotero-link 8) (or zotero-desc desc) format)
+                      )
+                  nil
+                  ))
+
+              ))
+        nil
+        )))
+
+
+
   (add-hook 'org-zotxt-mode-hook
             (lambda ()
-              (org-link-set-parameters "zotero" :follow #'org-zotero-open-via-macos :export #'org-zotero-export)
+              (progn
+                (org-link-set-parameters "zotero" :follow #'org-zotero-open-via-macos :export #'org-zotxt--link-export)
+                (org-link-set-parameters "id" :follow #'org-id-open :store #'org-id-store-link-maybe :export #'org-id-of-zotero-note-export-maybe)
+                )
               ))
 
   )
@@ -262,6 +314,8 @@
 
 
 (after! org
+  (require 'ox-beamer)
+  (require 'ox-latex)
   (setq org-checkbox-hierarchical-statistics t
         org-agenda-todo-list-sublevels t
         org-todo-keywords '((sequence "TODO(t)" "PEND(p)" "WAIT(w)" "|" "DONE(d)" "CANCELLED(c)"))
@@ -342,3 +396,10 @@
 ;; for dired
 (map! :map dirvish-mode-map
       :n "+" #'dired-create-empty-file)
+
+;; for eglot lsp config
+(after! eglot
+  (set-eglot-client! 'cc-mode '("clangd" "-j=3" "--clang-tidy"))
+  (set-eglot-client! 'python-mode '("pyright-langserver" "--stdio"))
+  (set-eglot-client! 'python-ts-mode '("pyright-langserver" "--stdio"))
+  )
