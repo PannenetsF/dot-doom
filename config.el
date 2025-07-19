@@ -259,6 +259,46 @@ return nil."
         nil
         )))
 
+  (defun org-zotxt-get-cite-key-from-zotero-id (zurl)
+    (let* ((zurl-id (substring zurl 22))
+           (response (request
+                       (format "%s/items" zotxt-url-base)
+                       :params `(("key" . ,zurl-id)
+                                 ("format" . "citekey"))
+                       :sync t
+                       :parser 'json-read))
+           (data (request-response-data response))
+           (result (if (and (vectorp data) (> (length data) 0))
+                       (aref data 0)
+                     (error "Unexpected response: empty or not a vector"))))
+      (message "Citation key: %s" result)
+      result))
+
+  (defun org-zotero-update-citekey-inline (&optional filename)
+    "Update the Zotero citekey of the current org file."
+    (interactive)
+    (let ((file (or filename (buffer-file-name))))
+      (unless file
+        (error "No file is associated with this buffer"))
+      (message "Updating Zotero citekey for file: %s" file)
+      (with-current-buffer (find-file-noselect file)
+        (save-excursion
+          (goto-char (point-min))
+          (let* ((zurl-with-desc (org-entry-get nil org-zotxt-noter-zotero-link))
+                 (zurl (when zurl-with-desc
+                         (extract-zotero-link-from-path zurl-with-desc)))
+                 (cite-key (when zurl
+                             (org-zotxt-get-cite-key-from-zotero-id zurl)))
+                 (new-link (when cite-key
+                             (org-link-make-string zurl cite-key))))
+            (if cite-key
+                (progn
+                  (message "Zotero link: %s" zurl)
+                  (message "Cite key: %s" cite-key)
+                  (org-entry-put nil org-zotxt-noter-zotero-link new-link)
+                  (save-buffer)
+                  (message "Citekey updated to: %s" cite-key))
+              (message "No cite-key found for Zotero link: %s" zurl)))))))
 
 
   (add-hook 'org-zotxt-mode-hook
@@ -346,6 +386,7 @@ return nil."
          :desc "org roam capture" "c" #'org-roam-capture
          :desc "org roam weekbook" "w" #'org-roam-dailies-capture-today
          :desc "org roam capture paper" "p" #'jump-to-zotxt-note-by-search
+         :desc "org roam update zotero citekey of current file" "z" #'org-zotero-update-citekey-inline
          :desc "org roam find" "f" #'org-roam-node-find
          :desc "org roam ui toggle" "u" #'org-roam-ui-mode
          :desc "org roam ui follow toggle" "F" #'org-roam-ui-follow-mode
@@ -403,3 +444,6 @@ return nil."
   (set-eglot-client! 'python-mode '("pyright-langserver" "--stdio"))
   (set-eglot-client! 'python-ts-mode '("pyright-langserver" "--stdio"))
   )
+
+;; load doom env
+(doom-load-envvars-file (expand-file-name "doomenv" doom-user-dir))
