@@ -211,6 +211,19 @@
      ))
 
 
+  (defun notify-via-macos (title msg)
+    (call-process "terminal-notifier"
+                  nil 0 nil
+                  "-group" "Emacs"
+                  "-title" title
+                  "-sender" "org.gnu.Emacs"
+                  "-message" msg
+                  "-active" "org.gnu.Emacs"))
+
+  (advice-add 'org-pomodoro-notify :after (lambda (title message)
+                                            (notify-via-macos title message)))
+
+
   (defun org-zotero-open-via-macos (path _)
     (call-process "open" nil nil nil (concat "zotero:" path)))
 
