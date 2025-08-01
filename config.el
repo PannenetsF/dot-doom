@@ -44,9 +44,6 @@
 ;; numbers are disabled. For relative line numbers, set this to `relative'.
 (setq display-line-numbers-type 'relative)
 
-;; If you use `org' and don't want your org files in the default location below,
-;; change `org-directory'. It must be set before org loads!
-(setq org-directory "~/Documents/org/")
 
 
 ;; Whenever you reconfigure a package, make sure to wrap your config in an
@@ -106,17 +103,19 @@
   ;; immediately. By using :hook here, the `hl-todo` package won't be loaded
   ;; until prog-mode-hook is triggered (by activating a major mode derived from
   ;; it, e.g. python-mode)
+  :after org
   :hook ('org-mode-hook . 'org-zotxt-mode)
   :init
   ;; code here will run immediately
   (require 'request)
   (require 'deferred)
-  (require 'org-zotxt-noter)
-  (require 'org-noter)
+  ;; (require 'org-zotxt-noter)
+  ;; (require 'org-noter)
   (require 'org-zotxt)
   (setq org-zotxt-notes-directory (expand-file-name "zotero/" org-roam-directory)
         org-zotxt-link-description-style :citekey
-        zotxt-default-bibliography-style "ieee")
+        zotxt-default-bibliography-style "ieee"
+        zotxt-default-library :user)
 
 
   (defvar org-roam-zotero-note--file-name ""
@@ -193,11 +192,11 @@
                            (org-entry-put (point) "ID" (org-id-new))
                            (org-entry-put (point) org-zotxt-noter-zotero-link (org-zotxt-make-item-link resp))
                            (org-roam-db-sync)
-                           (let ((path (org-zotxt-choose-path (cdr (assq 'paths (plist-get resp :paths))))))
-                             (org-entry-put (point) org-noter-property-doc-file path)
-                             (save-buffer)
-                             (message "Zotxt Linking note to Zotero item %s" (plist-get resp :key))
-                             )
+                           ;; (let ((path (org-zotxt-choose-path (cdr (assq 'paths (plist-get resp :paths))))))
+                           ;;   (org-entry-put (point) org-noter-property-doc-file path)
+                           ;;   (save-buffer)
+                           ;;   (message "Zotxt Linking note to Zotero item %s" (plist-get resp :key))
+                           ;;   )
                            )
                          )
                        ))
@@ -352,6 +351,7 @@ return nil."
         )
   )
 
+(setq org-directory "~/Documents/org/")
 
 (after! org
   (require 'ox-beamer)
@@ -374,6 +374,8 @@ return nil."
            (file+olp +org-capture-notes-file "Ideas")
            "* %?\n"))
         org-agenda-files (directory-files-recursively org-directory "\\.org$")
+        org-log-done t
+        org-log-into-drawer t
         )
 
   (map! :leader
@@ -395,29 +397,38 @@ return nil."
         )
   )
 
+(after! org-pomodoro
+  (setq org-pomodoro-length 30
+        org-pomodoro-short-break-length 5
+        org-pomodoro-long-break-length 20
+        org-pomodoro-short-break-sound nil
+        org-pomodoro-long-break-sound nil
+        )
+  )
+
 ;; 5. disable quit confirmation
 (setq confirm-kill-emacs nil)
 
-;; 6. accelerate tramp
-(use-package tramp
-  :config
-  (setq tramp-auto-save-directory "/tmp/tramp-autosaves/"
-        tramp-terminal-type "tramp"
-        tramp-backup-directory-alist backup-directory-alist
-        remote-file-name-inhibit-cache 60 ; 加速，允许 cache
-        remote-file-name-inhibit-locks t ; 加速，不会使用文件锁
-        tramp-verbose 0 ; 加速，更少的 tramp 信息
-        vc-handled-backends '(SVN Git) ; 加速，禁用一些版本控制后端
-        )
-  (setq tramp-use-ssh-controlmaster-options nil)
-  (setq tramp-chunksize 2000)
-  (connection-local-set-profile-variables
-   'remote-direct-async-process
-   '((tramp-direct-async-process . t)))
-  (connection-local-set-profiles
-   '(:application tramp :protocol "ssh")
-   'remote-direct-async-process)
-  )
+;; 6. accelerate tramp ~disable for now~
+;; (use-package tramp
+;;   :config
+;;   (setq tramp-auto-save-directory "/tmp/tramp-autosaves/"
+;;         tramp-terminal-type "tramp"
+;;         tramp-backup-directory-alist backup-directory-alist
+;;         remote-file-name-inhibit-cache 60 ; 加速，允许 cache
+;;         remote-file-name-inhibit-locks t ; 加速，不会使用文件锁
+;;         tramp-verbose 0 ; 加速，更少的 tramp 信息
+;;         vc-handled-backends '(SVN Git) ; 加速，禁用一些版本控制后端
+;;         )
+;;   (setq tramp-use-ssh-controlmaster-options nil)
+;;   (setq tramp-chunksize 2000)
+;;   (connection-local-set-profile-variables
+;;    'remote-direct-async-process
+;;    '((tramp-direct-async-process . t)))
+;;   (connection-local-set-profiles
+;;    '(:application tramp :protocol "ssh")
+;;    'remote-direct-async-process)
+;;   )
 
 ;; vim-like keybindings
 (map! :leader
