@@ -471,3 +471,10 @@ return nil."
 
 ;; load doom env
 (doom-load-envvars-file (expand-file-name "doomenv" doom-user-dir))
+;; setup company
+(after! company
+  ;; for org
+  (set-company-backend! 'org-mode 'company-files 'company-capf)
+  ;; for prog
+  (set-company-backend! 'prog-mode 'company-capf 'company-files 'company-yasnippet 'company-dabbrev-code 'company-dabbrev)
+  )
