@@ -473,27 +473,6 @@ return nil."
 ;; load doom env
 (doom-load-envvars-file (expand-file-name "doomenv" doom-user-dir))
 
-;; setup lsp-bridge
-(use-package! lsp-bridge
-  :config
-  (setq lsp-bridge-python-lsp-server 'pylsp
-        lsp-bridge-c-lsp-server 'clangd
-        lsp-bridge-python-command "python"
-        lsp-bridge-enable-with-tramp t
-        lsp-bridge-python-multi-lsp-server "pylsp_ruff"
-        ;; lsp-bridge-remote-start-automatically t
-        acm-enable-copilot t)
-  ;; (add-to-list 'lsp-bridge-multi-lang-server-extension-list '(("py") . "basedpyright_ruff"))
-  ;; disable corfu in lsp-bridge mode
-  ;; corfu is to post completion list, thus conflicting with lsp-bridge
-  (add-hook 'lsp-bridge-mode-hook (lambda ()
-                                    (progn
-                                      (when (functionp 'company-mode) (company-mode -1))
-                                      (when (functionp 'corfu-mode) (corfu-mode -1))
-                                      (when (functionp 'eglot-shutdown-all) (eglot-shutdown-all))
-                                      (when (functionp 'copilot-mode) (copilot-mode -1))
-                                      )))
-  )
 
 ;; setup company
 (after! company
