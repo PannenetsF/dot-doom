@@ -2,6 +2,49 @@
 
 * Install 
 
+** Mac
 #+begin_src
 brew install emacs-plus --with-modern-black-dragon-icon --with-mailutils --with-imagemagick
+#+end_src
+
+** Linux 
+#+begin_src
+apt install gnutls-bin libgnutls28-dev -y
+apt install libgccjit-8-dev -y
+apt install libtool libtool-bin -y
+apt install pkg-config -y
+apt install autoconf texinfo -y
+apt install software-properties-common -y
+apt-get install libcurl4-gnutls-dev -y
+apt-get install gettext -y
+
+cd /usr/src
+wget https://www.kernel.org/pub/software/scm/git/git-2.48.0.tar.gz
+tar xzf git-2.48.0.tar.gz
+cd git-2.48.0
+make prefix=/usr/local/ NO_TCLTK=1 all -j64
+make prefix=/usr/local/ NO_TCLTK=1 install
+apt remove git -y
+
+mkdir -p ~/emacs_build
+cd ~/emacs_build
+rm "emacs*" -rf
+wget -c  https://ftpmirror.gnu.org/emacs/emacs-30.1.tar.gz
+tar xvfz emacs-30.1.tar.gz
+cd emacs-30.1
+export CC=gcc-8
+./configure --with-native-compilation=aot 
+make -j64
+make install
+#+end_src
+
+
+* Setup Doom 
+#+begin_src
+rm -rf ~/.config/doom ~/.config/emacs 
+git clone https://github.com/PannenetsF/dot-doom.git ~/.config/doom
+git clone https://github.com/doomemacs/doomemacs ~/.config/emacs
+~/.config/emacs/bin/doom install --doomdir ~/.config/doom --no-env
+~/.config/emacs/bin/doom env -o ~/.config/doom/doomenv --allow-all
+~/.config/emacs/bin/doom sync
 #+end_src

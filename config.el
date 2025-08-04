@@ -92,18 +92,18 @@
 
 (defun my-banner-for-nw-mode ()
   (let* ((banner '(
-	"████████ ██   ██ ██ ███    ██ ██   ██     ████████ ██     ██ ██  ██████ ███████ "
-	"   ██    ██   ██ ██ ████   ██ ██  ██         ██    ██     ██ ██ ██      ██      "
-	"   ██    ███████ ██ ██ ██  ██ █████          ██    ██  █  ██ ██ ██      █████   "
-	"   ██    ██   ██ ██ ██  ██ ██ ██  ██         ██    ██ ███ ██ ██ ██      ██      "
-	"   ██    ██   ██ ██ ██   ████ ██   ██        ██     ███ ███  ██  ██████ ███████ "
-	"                                                                                "
-	"                                                                                "
-	"      ██████  ██████  ██████  ███████      ██████  ███    ██  ██████ ███████    "
-	"     ██      ██    ██ ██   ██ ██          ██    ██ ████   ██ ██      ██         "
-	"     ██      ██    ██ ██   ██ █████       ██    ██ ██ ██  ██ ██      █████      "
-	"     ██      ██    ██ ██   ██ ██          ██    ██ ██  ██ ██ ██      ██         "
-	"      ██████  ██████  ██████  ███████      ██████  ██   ████  ██████ ███████    "))
+	           "████████ ██   ██ ██ ███    ██ ██   ██     ████████ ██     ██ ██  ██████ ███████ "
+	           "   ██    ██   ██ ██ ████   ██ ██  ██         ██    ██     ██ ██ ██      ██      "
+	           "   ██    ███████ ██ ██ ██  ██ █████          ██    ██  █  ██ ██ ██      █████   "
+	           "   ██    ██   ██ ██ ██  ██ ██ ██  ██         ██    ██ ███ ██ ██ ██      ██      "
+	           "   ██    ██   ██ ██ ██   ████ ██   ██        ██     ███ ███  ██  ██████ ███████ "
+	           "                                                                                "
+	           "                                                                                "
+	           "      ██████  ██████  ██████  ███████      ██████  ███    ██  ██████ ███████    "
+	           "     ██      ██    ██ ██   ██ ██          ██    ██ ████   ██ ██      ██         "
+	           "     ██      ██    ██ ██   ██ █████       ██    ██ ██ ██  ██ ██      █████      "
+	           "     ██      ██    ██ ██   ██ ██          ██    ██ ██  ██ ██ ██      ██         "
+	           "      ██████  ██████  ██████  ███████      ██████  ██   ████  ██████ ███████    "))
          (longest-line (apply #'max (mapcar #'length banner))))
     (put-text-property
      (point)
@@ -283,12 +283,10 @@ return nil."
               (goto-char (point-min))
               (let* (
                      (zotero-link-prop (org-entry-get (point) org-zotxt-noter-zotero-link))
-                     (zotero-link (extract-zotero-link-from-path zotero-link-prop))
-                     (zotero-desc (extract-zotero-desc-from-path zotero-link-prop))
                      )
-                (if zotero-link
+                (if zotero-link-prop
                     (progn
-                      (org-zotxt--link-export (substring zotero-link 8) (or zotero-desc desc) format)
+                      (org-zotxt--link-export (substring (extract-zotero-link-from-path zotero-link-prop) 8) (or (extract-zotero-desc-from-path zotero-link-prop) desc) format)
                       )
                   nil
                   ))
@@ -369,22 +367,23 @@ return nil."
 
   (setq org-roam-dailies-capture-templates
         '(
-          ("d" "Weekbook" entry "%?" :if-new
-           (file+head+olp "%<%Y-week%g>.org" "#+title: %<%Y-week%g>\n" ("Weekbook" "%<%A/week%g %Y-%m-%d>"))
+          ("d" "Weekbook" entry "** %?" 
+           :target (file+head+olp "%<%Y-week%U>.org" "#+title: %<%Y-week%U>\n" ("Weekbook" "%<%A/week%U %Y-%m-%d>"))
            :unnarrowed t
            )
-          ("i" "Ideas" entry "** %?" :if-new
-           (file+head+olp "%<%Y-week%g>.org" "#+title: %<%Y-week%g>\n" ("Ideas"))
+          ("i" "Ideas" entry "** %?" :target
+           (file+head+olp "%<%Y-week%U>.org" "#+title: %<%Y-week%U>\n" ("Ideas"))
            :unnarrowed t
            )
           )
         org-roam-capture-templates
         '(
-          ("d" "Normal Notes" plain "%?" :target
-           (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n") :unnarrowed t)
+          ("d" "Normal Notes" plain "%?" 
+           :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n") 
+           :unnarrowed t)
 
-          ("t" "Quick To-do" plain "no %?" :if-new
-           (file+head+olp "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n" ("TODOs" "%<%Y%m%d%H%M%S>"))
+          ("t" "Quick To-do" plain "%?" 
+           :target (file+head+olp "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n" ("TODOs" "%<%Y%m%d%H%M%S>"))
            :unnarrowed t)
           )
         )
@@ -434,6 +433,25 @@ return nil."
          :desc "org capture" "C" #'org-capture
          )
         )
+  (setq org-mode-ligatures
+        '((org-mode "|||>" "<|||" "<==>" "<!--" "####" "~~>" "||=" "||>"
+           ":::" "::=" "=:=" "===" "==>" "=!=" "=>>" "=<<" "=/=" "!=="
+           "!!." ">=>" ">>=" ">>>" ">>-" ">->" "->>" "-->" "---" "-<<"
+           "<~~" "<~>" "<*>" "<||" "<|>" "<$>" "<==" "<=>" "<=<" "<->"
+           "<--" "<-<" "<<=" "<<-" "<<<" "<+>" "</>" "###" "#_(" "..<"
+           "..." "+++" "/==" "///" "_|_" "www" "&&" "^=" "~~" "~@" "~="
+           "~>" "~-" "*>" "*/" "||" "|}" "|]" "|=" "|>" "|-" "{|"
+           "[|" "]#" "::" ":=" ":>" ":<" "$>" "==" "=>" "!=" "!!" ">:"
+           ">=" ">>" ">-" "-~" "-|" "->" "--" "-<" "<~" "<*" "<|" "<:"
+           "<$" "<=" "<>" "<-" "<<" "<+" "</" "#{" "#[" "#:" "#=" "#!"
+           "##" "#(" "#?" "#_" "%%" ".=" ".-" ".." ".?" "+>" "++" "?:"
+           "?=" "?." "??" ";;" "/*" "/=" "/>" "//" "__" "~~" "(*" "*)"
+           "\\\\" "://")))
+  (push (cons 'org-mode (cdr (assq 'org-mode org-mode-ligatures)))
+        +ligatures-alist)
+
+  (dolist (lig +ligatures-alist)
+    (ligature-set-ligatures (car lig) (cdr lig)))
   )
 
 (after! org-pomodoro
