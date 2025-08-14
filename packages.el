@@ -77,3 +77,7 @@
 
 
 ;; (package! benchmark-init)
+
+;; for mermaid org mode integration
+(package! mermaid-mode)
+(package! ob-mermaid)
