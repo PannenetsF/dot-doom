@@ -326,7 +326,7 @@ return nil."
                  (cite-key (when zurl
                              (org-zotxt-get-cite-key-from-zotero-id zurl)))
                  (new-link (when cite-key
-                             (org-link-make-string zurl cite-key))))
+                             (org-link-make-string zurl (concat "@" cite-key)))))
             (if cite-key
                 (progn
                   (message "Zotero link: %s" zurl)
@@ -521,7 +521,14 @@ return nil."
 ;; setup company
 (after! company
   ;; for org
-  (set-company-backend! 'org-mode 'company-files 'company-capf)
+  (set-company-backend! 'org-mode 'company-files 'company-capf 'company-yasnippet)
   ;; for prog
   (set-company-backend! 'prog-mode 'company-capf 'company-files 'company-yasnippet 'company-dabbrev-code 'company-dabbrev)
   )
+
+;; fix ein 
+(after! ein
+(defun pm--visible-buffer-name ()
+  (pm--buffer-name))
+        )
+
