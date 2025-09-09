@@ -22,6 +22,7 @@
 ;; accept. For example:
 ;;
 (setq doom-font (font-spec :family "JetBrainsMono Nerd Font" :size 18 ))
+(setq use-default-font-for-symbols nil)
 
 (defun private-cjk-font()
   (dolist (charset '(kana han cjk-misc symbol bopomofo))
@@ -31,6 +32,7 @@
 
 ;;
 ;; If you or Emacs can't find your font, use 'M-x describe-font' to look them
+
 ;; up, `M-x eval-region' to execute elisp code, and 'M-x doom/reload-font' to
 ;; refresh your font settings. If Emacs still can't find your font, it likely
 ;; wasn't installed correctly. Font issues are rarely Doom issues!
@@ -55,6 +57,7 @@
 ;; The exceptions to this rule:
 ;;
 ;;   - Setting file/directory variables (like `org-directory')
+
 ;;   - Setting variables which explicitly tell you to set them before their
 ;;     package is loaded (see 'C-h v VARIABLE' to look up their documentation).
 ;;   - Setting doom variables (which start with 'doom-' or '+').
@@ -117,6 +120,18 @@
 (setq +doom-dashboard-ascii-banner-fn #'my-banner-for-nw-mode)
 
 ;; 4. setup org-mode
+;; (use-package! org-latex-impatient
+;;   :after org
+;;   :defer
+;;   :hook (org-mode . org-latex-impatient-mode)
+;;   :init 
+;;   (setq org-latex-impatient-tex2svg-bin
+;;         ;; location of tex2svg executable
+;;         "~/node_modules/mathjax-node-cli/bin/tex2svg"))
+
+(use-package! org-elp)
+(setq org-directory "~/Documents/org/")
+
 (use-package! org-modern
   :after org
   :init 
@@ -351,6 +366,36 @@ return nil."
 (use-package! websocket
   :after org-roam)
 
+(use-package! org-roam
+  :after org
+  :config
+  (setq org-roam-directory (expand-file-name "roam" org-directory))
+  (setq org-roam-dailies-directory "weekbook/")
+  (setq org-roam-dailies-capture-templates
+        '(
+          ("d" "Weekbook" entry "** %?"
+           :target (file+head+olp "%<%Y-week%U>.org" "#+title: %<%Y-week%U>\n" ("Weekbook" "%<%A/week%U %Y-%m-%d>"))
+           :unnarrowed t
+           )
+          ("i" "Ideas" entry "** %?" :target
+           (file+head+olp "%<%Y-week%U>.org" "#+title: %<%Y-week%U>\n" ("Ideas"))
+           :unnarrowed t
+           )
+          )
+        org-roam-capture-templates
+        '(
+          ("d" "Normal Notes" plain "%?"
+           :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n")
+           :unnarrowed t)
+
+          ("t" "Quick To-do" plain "%?"
+           :target (file+head+olp "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n" ("TODOs" "%<%Y%m%d%H%M%S>"))
+           :unnarrowed t)
+          )
+        )
+  )
+
+
 (use-package! org-roam-ui
   :after org-roam ;; or :after org
   ;;         normally we'd recommend hooking orui after org-roam, but since org-roam does not have
@@ -362,34 +407,9 @@ return nil."
         org-roam-ui-follow t
         org-roam-ui-update-on-save t
         org-roam-ui-open-on-start t)
-
-  (setq org-roam-dailies-directory "weekbook/")
-
-  (setq org-roam-dailies-capture-templates
-        '(
-          ("d" "Weekbook" entry "** %?" 
-           :target (file+head+olp "%<%Y-week%U>.org" "#+title: %<%Y-week%U>\n" ("Weekbook" "%<%A/week%U %Y-%m-%d>"))
-           :unnarrowed t
-           )
-          ("i" "Ideas" entry "** %?" :target
-           (file+head+olp "%<%Y-week%U>.org" "#+title: %<%Y-week%U>\n" ("Ideas"))
-           :unnarrowed t
-           )
-          )
-        org-roam-capture-templates
-        '(
-          ("d" "Normal Notes" plain "%?" 
-           :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n") 
-           :unnarrowed t)
-
-          ("t" "Quick To-do" plain "%?" 
-           :target (file+head+olp "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n" ("TODOs" "%<%Y%m%d%H%M%S>"))
-           :unnarrowed t)
-          )
-        )
   )
 
-(setq org-directory "~/Documents/org/")
+
 
 (after! org
   (require 'ox-beamer)
@@ -519,16 +539,24 @@ return nil."
 
 
 ;; setup company
-(after! company
+(after! org
   ;; for org
-  (set-company-backend! 'org-mode 'company-files 'company-capf 'company-yasnippet)
+  (set-company-backend! 'org-mode 'company-math-symbols-latex 'company-latex-commands '(:separate company-ispell company-dabbrev company-dabbrev-code) 'company-files 'company-capf 'company-yasnippet)
+  )
+(after! company
   ;; for prog
   (set-company-backend! 'prog-mode 'company-capf 'company-files 'company-yasnippet 'company-dabbrev-code 'company-dabbrev)
   )
 
 ;; fix ein 
 (after! ein
-(defun pm--visible-buffer-name ()
-  (pm--buffer-name))
-        )
+  (defun pm--visible-buffer-name ()
+    (pm--buffer-name))
+  )
+
+;; set pdf view color to be solarized
+(setq pdf-view-midnight-colors '("#655370" . "#fbf8ef"))
+
+;; 
+(setq! imagemagick-types-inhibit '(C HTML HTM INFO M TXT PDF SVG))
 

@@ -81,3 +81,9 @@
 ;; for mermaid org mode integration
 (package! mermaid-mode)
 (package! ob-mermaid)
+
+;; org latex impatient 
+(package! org-latex-impatient
+  :recipe (:host github :repo "yangsheng6810/org-latex-impatient")) ;; :files ("*.el")))
+
+(package! org-elp)
