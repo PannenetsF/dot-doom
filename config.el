@@ -541,7 +541,8 @@ return nil."
 ;; setup company
 (after! org
   ;; for org
-  (set-company-backend! 'org-mode 'company-math-symbols-latex 'company-latex-commands '(:separate company-ispell company-dabbrev company-dabbrev-code) 'company-files 'company-capf 'company-yasnippet)
+  ;; (set-company-backend! 'org-mode 'company-math-symbols-latex 'company-latex-commands '(:separate company-ispell company-dabbrev company-dabbrev-code) 'company-files 'company-capf 'company-yasnippet)
+  (set-company-backend! 'org-mode '(company-files company-capf) 'company-math-symbols-latex 'company-latex-commands)
   )
 (after! company
   ;; for prog
