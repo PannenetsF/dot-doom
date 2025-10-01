@@ -232,12 +232,10 @@
                          (progn
                            (org-entry-put (point) "ID" (org-id-new))
                            (org-entry-put (point) org-zotxt-noter-zotero-link (org-zotxt-make-item-link resp))
+                           (org-roam-alias-add
+                            (cdr (assq 'title-short
+                                       (aref (json-read-from-string (plist-get resp :full)) 0))))
                            (org-roam-db-sync)
-                           ;; (let ((path (org-zotxt-choose-path (cdr (assq 'paths (plist-get resp :paths))))))
-                           ;;   (org-entry-put (point) org-noter-property-doc-file path)
-                           ;;   (save-buffer)
-                           ;;   (message "Zotxt Linking note to Zotero item %s" (plist-get resp :key))
-                           ;;   )
                            )
                          )
                        ))
