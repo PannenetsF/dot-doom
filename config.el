@@ -128,9 +128,12 @@
 ;;   (setq org-latex-impatient-tex2svg-bin
 ;;         ;; location of tex2svg executable
 ;;         "~/node_modules/mathjax-node-cli/bin/tex2svg"))
+(use-package! org
+  :config
+  (setq org-directory "~/Documents/org/")
+  )
 
 (use-package! org-elp)
-(setq org-directory "~/Documents/org/")
 
 (use-package! org-modern
   :after org
@@ -139,19 +142,66 @@
   :config
   (setq org-modern-fold-stars '(("▶" . "▼") ("▷" . "▽") ("⏵" . "⏷") ("▹" . "▿") ("▸" . "▾"))))
 
+(use-package! org-roam
+  :after org
+  :config
+  (setq org-roam-directory (expand-file-name "roam" org-directory))
+  (setq org-roam-dailies-directory "weekbook/")
+  (setq org-roam-dailies-capture-templates
+        '(
+          ("d" "Weekbook" entry "** %?"
+           :target (file+head+olp "%<%Y-week%U>.org" "#+title: %<%Y-week%U>\n" ("Weekbook" "%<%A/week%U %Y-%m-%d>"))
+           :unnarrowed t
+           )
+          ("i" "Ideas" entry "** %?" :target
+           (file+head+olp "%<%Y-week%U>.org" "#+title: %<%Y-week%U>\n" ("Ideas"))
+           :unnarrowed t
+           )
+          )
+        org-roam-capture-templates
+        '(
+          ("d" "Normal Notes" plain "%?"
+           :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n")
+           :unnarrowed t)
+
+          ("t" "Quick To-do" plain "%?"
+           :target (file+head+olp "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n" ("TODOs" "%<%Y%m%d%H%M%S>"))
+           :unnarrowed t)
+          )
+        )
+  )
+
+
+(use-package! org-roam-ui
+  :after org-roam ;; or :after org
+  ;;         normally we'd recommend hooking orui after org-roam, but since org-roam does not have
+  ;;         a hookable mode anymore, you're advised to pick something yourself
+  ;;         if you don't care about startup time, use
+  ;;         :hook (after-init . org-roam-ui-mode)
+  :config
+  (setq org-roam-ui-sync-theme t
+        org-roam-ui-follow t
+        org-roam-ui-update-on-save t
+        org-roam-ui-open-on-start t)
+  )
+
+
+
 (use-package! zotxt
   ;; if you omit :defer, :hook, :commands, or :after, then the package is loaded
   ;; immediately. By using :hook here, the `hl-todo` package won't be loaded
   ;; until prog-mode-hook is triggered (by activating a major mode derived from
   ;; it, e.g. python-mode)
-  :after org
+  :after org-roam
   :hook ('org-mode-hook . 'org-zotxt-mode)
-  :init
+  :config
   ;; code here will run immediately
   (require 'request)
   (require 'deferred)
   ;; (require 'org-zotxt-noter)
   ;; (require 'org-noter)
+  (message "now the org-dir is %s" org-directory)
+  (message "now the org-roam-dir is %s" org-roam-directory)
   (require 'org-zotxt)
   (setq org-zotxt-notes-directory (expand-file-name "zotero/" org-roam-directory)
         org-zotxt-link-description-style :citekey
@@ -363,49 +413,6 @@ return nil."
 ;; setup org-roam-ui
 (use-package! websocket
   :after org-roam)
-
-(use-package! org-roam
-  :after org
-  :config
-  (setq org-roam-directory (expand-file-name "roam" org-directory))
-  (setq org-roam-dailies-directory "weekbook/")
-  (setq org-roam-dailies-capture-templates
-        '(
-          ("d" "Weekbook" entry "** %?"
-           :target (file+head+olp "%<%Y-week%U>.org" "#+title: %<%Y-week%U>\n" ("Weekbook" "%<%A/week%U %Y-%m-%d>"))
-           :unnarrowed t
-           )
-          ("i" "Ideas" entry "** %?" :target
-           (file+head+olp "%<%Y-week%U>.org" "#+title: %<%Y-week%U>\n" ("Ideas"))
-           :unnarrowed t
-           )
-          )
-        org-roam-capture-templates
-        '(
-          ("d" "Normal Notes" plain "%?"
-           :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n")
-           :unnarrowed t)
-
-          ("t" "Quick To-do" plain "%?"
-           :target (file+head+olp "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n" ("TODOs" "%<%Y%m%d%H%M%S>"))
-           :unnarrowed t)
-          )
-        )
-  )
-
-
-(use-package! org-roam-ui
-  :after org-roam ;; or :after org
-  ;;         normally we'd recommend hooking orui after org-roam, but since org-roam does not have
-  ;;         a hookable mode anymore, you're advised to pick something yourself
-  ;;         if you don't care about startup time, use
-  ;;         :hook (after-init . org-roam-ui-mode)
-  :config
-  (setq org-roam-ui-sync-theme t
-        org-roam-ui-follow t
-        org-roam-ui-update-on-save t
-        org-roam-ui-open-on-start t)
-  )
 
 
 
