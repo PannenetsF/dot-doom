@@ -30,15 +30,23 @@ make prefix=/usr/local/ NO_TCLTK=1 all -j64
 make prefix=/usr/local/ NO_TCLTK=1 install
 apt remove git -y
 
+
 mkdir -p ~/emacs_build
 cd ~/emacs_build
 rm "emacs*" -rf
 wget -c  https://ftpmirror.gnu.org/emacs/emacs-30.1.tar.gz
 tar xvfz emacs-30.1.tar.gz
-cd emacs-30.1
 export CC=gcc
-./configure --with-native-compilation=aot 
-make -j64
+
+git clone https://github.com/tree-sitter/tree-sitter.git
+cd tree-sitter/
+make -j128
+make install
+cd ..
+
+cd emacs-30.1
+./configure --with-native-compilation=aot --with-tree-sitter
+make -j128
 make install
 #+end_src
 
@@ -52,3 +60,16 @@ git clone https://github.com/doomemacs/doomemacs ~/.config/emacs
 ~/.config/emacs/bin/doom env -o ~/.config/doom/doomenv --allow-all
 ~/.config/emacs/bin/doom sync
 #+end_src
+
+* Color
+name it =src.src=
+#+begin_src
+xterm-emacs|xterm with 24-bit direct color mode for Emacs,
+  use=xterm-256color,
+  setb24=\E[48\:2\:\:%p1%{65536}%/%d\:%p1%{256}%/%{255}%&\
+     %d\:%p1%{255}%&%dm,
+  setf24=\E[38\:2\:\:%p1%{65536}%/%d\:%p1%{256}%/%{255}%&\
+     %d\:%p1%{255}%&%dm,
+#+end_src
+run =tic -x -o ~/.terminfo src.src=
+then there is a new TERM option =xterm-emacs=
