@@ -9,14 +9,18 @@ brew install emacs-plus --with-modern-black-dragon-icon --with-mailutils --with-
 
 ** Linux 
 #+begin_src
+apt-get install build-essential -y
+GCC_MAJOR=$(gcc -dumpfullversion -dumpversion | cut -d. -f1)
+apt install libgccjit-${GCC_MAJOR}-dev -y
+apt install tmux wget zsh -y
 apt install gnutls-bin libgnutls28-dev -y
-apt install libgccjit-8-dev -y
 apt install libtool libtool-bin -y
 apt install pkg-config -y
 apt install autoconf texinfo -y
 apt install software-properties-common -y
 apt-get install libcurl4-gnutls-dev -y
 apt-get install gettext -y
+apt-get install tmux -y
 
 cd /usr/src
 wget https://www.kernel.org/pub/software/scm/git/git-2.48.0.tar.gz
@@ -32,7 +36,7 @@ rm "emacs*" -rf
 wget -c  https://ftpmirror.gnu.org/emacs/emacs-30.1.tar.gz
 tar xvfz emacs-30.1.tar.gz
 cd emacs-30.1
-export CC=gcc-8
+export CC=gcc
 ./configure --with-native-compilation=aot 
 make -j64
 make install
