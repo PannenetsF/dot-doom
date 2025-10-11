@@ -153,19 +153,11 @@
            :target (file+head+olp "%<%Y-week%U>.org" "#+title: %<%Y-week%U>\n" ("Weekbook" "%<%A/week%U %Y-%m-%d>"))
            :unnarrowed t
            )
-          ("i" "Ideas" entry "** %?" :target
-           (file+head+olp "%<%Y-week%U>.org" "#+title: %<%Y-week%U>\n" ("Ideas"))
-           :unnarrowed t
-           )
           )
         org-roam-capture-templates
         '(
           ("d" "Normal Notes" plain "%?"
            :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n")
-           :unnarrowed t)
-
-          ("t" "Quick To-do" plain "%?"
-           :target (file+head+olp "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n" ("TODOs" "%<%Y%m%d%H%M%S>"))
            :unnarrowed t)
           )
         )
@@ -566,3 +558,74 @@ return nil."
 ;; 
 (setq! imagemagick-types-inhibit '(C HTML HTM INFO M TXT PDF SVG))
 
+;; autoflow from https://emacs-china.org/t/autoflow-el/25381
+
+(defvar autoflow-list nil)
+(defvar autoflow-curr-nth 0)
+(defvar autoflow-curr-flow nil)
+
+(defmacro define-autoflow (name &rest funcs)
+  `(progn
+     (if-let ((match (assoc ,name autoflow-list)))
+         (unless (equal (cdr match) ',funcs)
+           (setcdr match ',funcs))
+       (push (append (list ,name) ',funcs) autoflow-list))
+     autoflow-list))
+
+(defun autoflow-set-header-info ()
+  (let* ((name autoflow-curr-flow)
+         (funcs (autoflow-flows name)))
+    (setq-local header-line-format
+                (format "Autoflow %s/%s [%s] "
+                        (1+ autoflow-curr-nth) (length funcs) name))))
+
+(defun autoflow-flows (name)
+  (cdr (assoc name autoflow-list)))
+
+(defun autoflow--curr-func (nth funcs)
+  "Return the current applying function as a list."
+  (if-let* ((func (nth nth funcs))
+            (_ (functionp func)))
+      (list func)
+    func))
+
+(defun autoflow--next ()
+  (cl-incf autoflow-curr-nth)
+  (let* ((flow-name autoflow-curr-flow)
+         (flow-funcs (autoflow-flows flow-name)))
+    (if (< autoflow-curr-nth (length flow-funcs))
+        (progn
+          (setq-local header-line-format nil)
+          (apply (autoflow--curr-func autoflow-curr-nth flow-funcs))
+          (autoflow-set-header-info))
+      (message "autoflow %s over!" autoflow-curr-flow)
+      (setq autoflow-curr-flow nil)
+      (setq autoflow-curr-nth 0)
+      (setq-local header-line-format nil))))
+
+;;;###autoload
+(defun autoflow-start (&optional name)
+  (interactive)
+  (if autoflow-curr-flow
+      (autoflow--next)
+    (let* ((flow-name (completing-read "Choose a autoflow: "
+                                  autoflow-list nil t))
+           (flow-funcs (autoflow-flows flow-name)))
+      (setq autoflow-curr-flow flow-name)
+      (setq autoflow-curr-nth 0)
+      (apply (autoflow--curr-func autoflow-curr-nth flow-funcs))
+      (autoflow-set-header-info))))
+
+(define-autoflow "come"
+                 (lambda ()
+                   (shell-command (concat "cd " org-directory " && make come")))
+                 (org-todo-list)
+                 (org-roam-dailies-capture-today)
+                 )
+
+(define-autoflow "go"
+                 (org-todo-list)
+                 (org-roam-dailies-find-today)
+                 (lambda ()
+                   (shell-command (concat "cd " org-directory " && make go")))
+                 )
