@@ -630,17 +630,19 @@ return nil."
                    (shell-command (concat "cd " org-directory " && make go")))
                  )
 
+(after! org-roam
 
-(require 'find-lisp)
-(defun hugo-page-publish (file)
-  (with-current-buffer (find-file-noselect file)
-    (setq org-hugo-base-dir org-directory)
-    (let ((org-id-extra-files (find-lisp-find-files org-roam-directory "\.org$")))
-      (org-hugo-export-wim-to-md))))
+  (require 'find-lisp)
+  (defun hugo-page-publish (file)
+    (with-current-buffer (find-file-noselect file)
+      (setq org-hugo-base-dir org-directory)
+      (let ((org-id-extra-files (find-lisp-find-files org-roam-directory "\.org$")))
+        (org-hugo-export-wim-to-md))))
 
-(defun org-roam-export-all-as-hugo ()
-  "re-exports all org-roam files to hugo markdown."
-  (interactive)
-  (dolist (f (org-roam--list-files org-roam-directory))
-    (hugo-page-publish f)
-    ))
+  (defun org-roam-export-all-as-hugo ()
+    "re-exports all org-roam files to hugo markdown."
+    (interactive)
+    (dolist (f (org-roam--list-files org-roam-directory))
+      (hugo-page-publish f)
+      ))
+  )
