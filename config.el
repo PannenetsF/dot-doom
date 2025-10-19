@@ -331,6 +331,8 @@ return nil."
 
   (defun org-id-of-zotero-note-export-maybe (path desc format)
     "Export function for org-id links that may contain Zotero links."
+
+    (when (eq format 'latex)
     (let ((file-name (car (org-roam-id-find path))))
       (if (and file-name (file-exists-p file-name))
           (with-current-buffer (find-file-noselect file-name)
@@ -349,6 +351,7 @@ return nil."
               ))
         nil
         )))
+    )
 
   (defun org-zotxt-get-cite-key-from-zotero-id (zurl)
     (let* ((zurl-id (substring zurl 22))
