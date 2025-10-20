@@ -333,24 +333,24 @@ return nil."
     "Export function for org-id links that may contain Zotero links."
 
     (when (eq format 'latex)
-    (let ((file-name (car (org-roam-id-find path))))
-      (if (and file-name (file-exists-p file-name))
-          (with-current-buffer (find-file-noselect file-name)
-            (save-excursion
-              (goto-char (point-min))
-              (let* (
-                     (zotero-link-prop (org-entry-get (point) org-zotxt-noter-zotero-link))
-                     )
-                (if zotero-link-prop
-                    (progn
-                      (org-zotxt--link-export (substring (extract-zotero-link-from-path zotero-link-prop) 8) (or (extract-zotero-desc-from-path zotero-link-prop) desc) format)
-                      )
-                  nil
-                  ))
+      (let ((file-name (car (org-roam-id-find path))))
+        (if (and file-name (file-exists-p file-name))
+            (with-current-buffer (find-file-noselect file-name)
+              (save-excursion
+                (goto-char (point-min))
+                (let* (
+                       (zotero-link-prop (org-entry-get (point) org-zotxt-noter-zotero-link))
+                       )
+                  (if zotero-link-prop
+                      (progn
+                        (org-zotxt--link-export (substring (extract-zotero-link-from-path zotero-link-prop) 8) (or (extract-zotero-desc-from-path zotero-link-prop) desc) format)
+                        )
+                    nil
+                    ))
 
-              ))
-        nil
-        )))
+                ))
+          nil
+          )))
     )
 
   (defun org-zotxt-get-cite-key-from-zotero-id (zurl)
