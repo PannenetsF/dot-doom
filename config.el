@@ -649,3 +649,7 @@ return nil."
       (hugo-page-publish f)
       ))
   )
+
+(use-package! lsp-ui
+              :config
+              (setq lsp-ui-auto-refresh t))
