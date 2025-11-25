@@ -653,3 +653,10 @@ return nil."
 (use-package! lsp-ui
               :config
               (setq lsp-ui-auto-refresh t))
+
+(use-package! keyfreq
+  :config
+  (require 'keyfreq)
+  (keyfreq-mode 1)
+  (keyfreq-autosave-mode 1))
+
