@@ -120,14 +120,6 @@
 (setq +doom-dashboard-ascii-banner-fn #'my-banner-for-nw-mode)
 
 ;; 4. setup org-mode
-;; (use-package! org-latex-impatient
-;;   :after org
-;;   :defer
-;;   :hook (org-mode . org-latex-impatient-mode)
-;;   :init 
-;;   (setq org-latex-impatient-tex2svg-bin
-;;         ;; location of tex2svg executable
-;;         "~/node_modules/mathjax-node-cli/bin/tex2svg"))
 (use-package! org
   :config
   (setq org-directory "~/Documents/org/")
@@ -436,6 +428,8 @@ return nil."
         org-log-into-drawer t
         )
 
+  (plist-put org-format-latex-options :scale 2.5)
+
   (map! :leader
         (:prefix-map ("X" . "Org")
          :desc "org refresh statistics of current line" "R" #'org-update-statistics-cookies
@@ -650,6 +644,10 @@ return nil."
       ))
   )
 
+(use-package! org-fragtog
+  :after org
+  :hook (org-mode . org-fragtog-mode))
+
 (use-package! lsp-ui
               :config
               (setq lsp-ui-auto-refresh t))
@@ -663,7 +661,7 @@ return nil."
 (use-package! vulpea
   :hook ((org-roam-db-autosync-mode . vulpea-db-autosync-enable)))
 
-(after! vulpea
+(after! org-roam
 
   ;;* dynamic agenda https://github.com/brianmcgillion/doomd/blob/master/config.org
   ;; https://d12frosted.io/posts/2021-01-16-task-management-with-roam-vol5.html
@@ -730,7 +728,17 @@ tasks."
     (let ((roam-agenda-files (delete-dups (my/org-roam-list-notes-by-tag "roam-agenda"))))
       (cl-union orig-val roam-agenda-files :test #'equal)))
 
+  (defun org-roam-update-agenda (file)
+    (with-current-buffer (find-file-noselect file)
+      (vulpea-project-update-tag)))
+
+  (defun org-roam-update-all-agenda ()
+    (interactive)
+    (message "Updating All Roam Agenda TAGs...")
+    (mapc #'org-roam-update-agenda (org-roam-list-files))
+    (message "Roam Agenda Updated!"))
+
   (add-hook 'before-save-hook #'vulpea-project-update-tag)
   (advice-add 'org-agenda-files :filter-return #'dynamic-agenda-files-advice)
 
-        )
+  )

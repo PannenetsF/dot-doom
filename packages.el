@@ -75,9 +75,6 @@
 (package! copilot
   :recipe (:host github :repo "copilot-emacs/copilot.el" :files ("*.el")))
 
-
-;; (package! benchmark-init)
-
 ;; for mermaid org mode integration
 (package! mermaid-mode)
 (package! ob-mermaid)
@@ -91,3 +88,10 @@
 ;; key freq
 (package! keyfreq
   :recipe (:host github :repo "dacap/keyfreq" :files ("*.el")))
+
+;; org-fragtog
+(package! org-fragtog
+  :recipe (:host github :repo "io12/org-fragtog" :files ("*.el")))
+
+(package! vulpea
+  :recipe (:host github :repo "d12frosted/vulpea" :files ("*.el")))
