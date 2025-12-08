@@ -83,8 +83,6 @@
 (package! org-latex-impatient
   :recipe (:host github :repo "yangsheng6810/org-latex-impatient")) ;; :files ("*.el")))
 
-(package! org-elp)
-
 ;; key freq
 (package! keyfreq
   :recipe (:host github :repo "dacap/keyfreq" :files ("*.el")))

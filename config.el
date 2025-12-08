@@ -1,4 +1,4 @@
-;;; $DOOMDIR/config.el -*- lexical-binding: t; -*-
+;; $DOOMDIR/config.el -*- lexical-binding: t; -*-
 
 ;; Place your private configuration here! Remember, you do not need to run 'doom
 ;; sync' after modifying this file!
@@ -7,7 +7,7 @@
 ;; Some functionality uses this to identify you, e.g. GPG configuration, email
 ;; clients, file templates and snippets. It is optional.
 ;; (setq user-full-name "John Doe"
-;;       user-mail-address "john@doe.com")
+;;       user-mail-address "john at doe.com")
 
 ;; Doom exposes five (optional) variables for controlling fonts in Doom:
 ;;
@@ -21,6 +21,10 @@
 ;; See 'C-h v doom-font' for documentation and more examples of what they
 ;; accept. For example:
 ;;
+
+;; load doom env
+(doom-load-envvars-file (expand-file-name "doomenv" doom-user-dir))
+
 (setq doom-font (font-spec :family "FiraCode Nerd Font Mono" :size 18 ))
 (setq use-default-font-for-symbols nil)
 
@@ -29,8 +33,13 @@
     (set-fontset-font t charset (font-spec :family "LXGW WenKai Mono"))))
 
 (add-hook 'after-setting-font-hook #'private-cjk-font)
-(setq doom-modeline-major-mode-icon t)
-(setq doom-modeline-hud-min-height 1)
+
+(after! doom-modeline
+  (setq doom-modeline-bar-width 4
+        doom-modeline-mu4e t
+        doom-modeline-major-mode-icon t
+        doom-modeline-major-mode-color-icon t
+        doom-modeline-buffer-file-name-style 'truncate-upto-project))
 
 ;; If you or Emacs can't find your font, use 'M-x describe-font' to look them
 
@@ -119,14 +128,67 @@
      'face 'doom-dashboard-banner)))
 
 (setq +doom-dashboard-ascii-banner-fn #'my-banner-for-nw-mode)
+(remove-hook '+doom-dashboard-functions #'doom-dashboard-widget-footer)
+(add-hook! '+doom-dashboard-mode-hook (hl-line-mode -1))
+(setq-hook! '+doom-dashboard-mode-hook evil-normal-state-cursor (list nil))
 
 ;; 4. setup org-mode
 (use-package! org
+              :defer t
   :config
-  (setq org-directory "~/Documents/org/")
+  (setq org-directory "~/Documents/org/"
+  org-checkbox-hierarchical-statistics t
+        org-agenda-todo-list-sublevels t
+        org-todo-keywords '((sequence "TODO(t)" "PEND(p)" "WAIT(w)" "|" "DONE(d)" "CANCELLED(c)"))
+        org-capture-templates
+        '(
+          ("t" "Quick To-do" entry
+           (file+headline +org-capture-notes-file "TO-DO Inbox")
+           "* TODO %?\n%i\n%a" :prepend t)
+          ("w" "Weekly workbook" entry
+           (file+olp+datetree +org-capture-notes-file "Workbook")
+           "* %?\n" :tree-type week :prepend t)
+          ("p" "Project note" entry
+           (file+headline +org-capture-notes-file "Projects")
+           "* TODO %^{ProjectName}\n%u\n%a\n")
+          ("i" "Quick Thought" entry
+           (file+olp +org-capture-notes-file "Ideas")
+           "* %?\n"))
+        org-agenda-files (directory-files-recursively org-directory "\\.org$")
+        org-log-done t
+        org-log-into-drawer t
+        )
+    (setq org-mode-ligatures
+        '((org-mode "|||>" "<|||" "<==>" "<!--" "####" "~~>" "||=" "||>"
+           ":::" "::=" "=:=" "===" "==>" "=!=" "=>>" "=<<" "=/=" "!=="
+           "!!." ">=>" ">>=" ">>>" ">>-" ">->" "->>" "-->" "---" "-<<"
+           "<~~" "<~>" "<*>" "<||" "<|>" "<$>" "<==" "<=>" "<=<" "<->"
+           "<--" "<-<" "<<=" "<<-" "<<<" "<+>" "</>" "###" "#_(" "..<"
+           "..." "+++" "/==" "///" "_|_" "www" "&&" "^=" "~~" "~@" "~="
+           "~>" "~-" "*>" "*/" "||" "|}" "|]" "|=" "|>" "|-" "{|"
+           "[|" "]#" "::" ":=" ":>" ":<" "$>" "==" "=>" "!=" "!!" ">:"
+           ">=" ">>" ">-" "-~" "-|" "->" "--" "-<" "<~" "<*" "<|" "<:"
+           "<$" "<=" "<>" "<-" "<<" "<+" "</" "#{" "#[" "#:" "#=" "#!"
+           "##" "#(" "#?" "#_" "%%" ".=" ".-" ".." ".?" "+>" "++" "?:"
+           "?=" "?." "??" ";;" "/*" "/=" "/>" "//" "__" "~~" "(*" "*)"
+           "\\\\" "://")))
+  (push (cons 'org-mode (cdr (assq 'org-mode org-mode-ligatures)))
+        +ligatures-alist)
+
+  (dolist (lig +ligatures-alist)
+    (ligature-set-ligatures (car lig) (cdr lig)))
   )
 
-(use-package! org-elp)
+(use-package! org-pomodoro 
+              :after org
+              :config
+  (setq org-pomodoro-length 30
+        org-pomodoro-short-break-length 5
+        org-pomodoro-long-break-length 20
+        org-pomodoro-short-break-sound nil
+        org-pomodoro-long-break-sound nil
+        )
+              )
 
 (use-package! org-modern
   :after org
@@ -159,10 +221,6 @@
 
 (use-package! org-roam-ui
   :after org-roam ;; or :after org
-  ;;         normally we'd recommend hooking orui after org-roam, but since org-roam does not have
-  ;;         a hookable mode anymore, you're advised to pick something yourself
-  ;;         if you don't care about startup time, use
-  ;;         :hook (after-init . org-roam-ui-mode)
   :config
   (setq org-roam-ui-sync-theme t
         org-roam-ui-follow t
@@ -185,8 +243,6 @@
   (require 'deferred)
   ;; (require 'org-zotxt-noter)
   ;; (require 'org-noter)
-  (message "now the org-dir is %s" org-directory)
-  (message "now the org-roam-dir is %s" org-roam-directory)
   (require 'org-zotxt)
   (setq org-zotxt-notes-directory (expand-file-name "zotero/" org-roam-directory)
         org-zotxt-link-description-style :citekey
@@ -405,29 +461,9 @@ return nil."
 
 
 (after! org
-  (require 'ox-beamer)
-  (require 'ox-latex)
-  (setq org-checkbox-hierarchical-statistics t
-        org-agenda-todo-list-sublevels t
-        org-todo-keywords '((sequence "TODO(t)" "PEND(p)" "WAIT(w)" "|" "DONE(d)" "CANCELLED(c)"))
-        org-capture-templates
-        '(
-          ("t" "Quick To-do" entry
-           (file+headline +org-capture-notes-file "TO-DO Inbox")
-           "* TODO %?\n%i\n%a" :prepend t)
-          ("w" "Weekly workbook" entry
-           (file+olp+datetree +org-capture-notes-file "Workbook")
-           "* %?\n" :tree-type week :prepend t)
-          ("p" "Project note" entry
-           (file+headline +org-capture-notes-file "Projects")
-           "* TODO %^{ProjectName}\n%u\n%a\n")
-          ("i" "Quick Thought" entry
-           (file+olp +org-capture-notes-file "Ideas")
-           "* %?\n"))
-        org-agenda-files (directory-files-recursively org-directory "\\.org$")
-        org-log-done t
-        org-log-into-drawer t
-        )
+  ;; for org
+  ;; (set-company-backend! 'org-mode 'company-math-symbols-latex 'company-latex-commands '(:separate company-ispell company-dabbrev company-dabbrev-code) 'company-files 'company-capf 'company-yasnippet)
+  (set-company-backend! 'org-mode '(company-files company-capf) 'company-math-symbols-latex 'company-latex-commands)
 
   (plist-put org-format-latex-options :scale 2.5)
 
@@ -447,34 +483,6 @@ return nil."
          :desc "org roam ui follow toggle" "F" #'org-roam-ui-follow-mode
          :desc "org capture" "C" #'org-capture
          )
-        )
-  (setq org-mode-ligatures
-        '((org-mode "|||>" "<|||" "<==>" "<!--" "####" "~~>" "||=" "||>"
-           ":::" "::=" "=:=" "===" "==>" "=!=" "=>>" "=<<" "=/=" "!=="
-           "!!." ">=>" ">>=" ">>>" ">>-" ">->" "->>" "-->" "---" "-<<"
-           "<~~" "<~>" "<*>" "<||" "<|>" "<$>" "<==" "<=>" "<=<" "<->"
-           "<--" "<-<" "<<=" "<<-" "<<<" "<+>" "</>" "###" "#_(" "..<"
-           "..." "+++" "/==" "///" "_|_" "www" "&&" "^=" "~~" "~@" "~="
-           "~>" "~-" "*>" "*/" "||" "|}" "|]" "|=" "|>" "|-" "{|"
-           "[|" "]#" "::" ":=" ":>" ":<" "$>" "==" "=>" "!=" "!!" ">:"
-           ">=" ">>" ">-" "-~" "-|" "->" "--" "-<" "<~" "<*" "<|" "<:"
-           "<$" "<=" "<>" "<-" "<<" "<+" "</" "#{" "#[" "#:" "#=" "#!"
-           "##" "#(" "#?" "#_" "%%" ".=" ".-" ".." ".?" "+>" "++" "?:"
-           "?=" "?." "??" ";;" "/*" "/=" "/>" "//" "__" "~~" "(*" "*)"
-           "\\\\" "://")))
-  (push (cons 'org-mode (cdr (assq 'org-mode org-mode-ligatures)))
-        +ligatures-alist)
-
-  (dolist (lig +ligatures-alist)
-    (ligature-set-ligatures (car lig) (cdr lig)))
-  )
-
-(after! org-pomodoro
-  (setq org-pomodoro-length 30
-        org-pomodoro-short-break-length 5
-        org-pomodoro-long-break-length 20
-        org-pomodoro-short-break-sound nil
-        org-pomodoro-long-break-sound nil
         )
   )
 
@@ -522,23 +530,8 @@ return nil."
 (map! :map dirvish-mode-map
       :n "+" #'dired-create-empty-file)
 
-;; for eglot lsp config
-(after! eglot
-  (set-eglot-client! 'cc-mode '("clangd" "-j=3" "--clang-tidy"))
-  (set-eglot-client! 'python-mode '("pyright-langserver" "--stdio"))
-  (set-eglot-client! 'python-ts-mode '("pyright-langserver" "--stdio"))
-  )
-
-;; load doom env
-(doom-load-envvars-file (expand-file-name "doomenv" doom-user-dir))
-
 
 ;; setup company
-(after! org
-  ;; for org
-  ;; (set-company-backend! 'org-mode 'company-math-symbols-latex 'company-latex-commands '(:separate company-ispell company-dabbrev company-dabbrev-code) 'company-files 'company-capf 'company-yasnippet)
-  (set-company-backend! 'org-mode '(company-files company-capf) 'company-math-symbols-latex 'company-latex-commands)
-  )
 (after! company
   ;; for prog
   (set-company-backend! 'prog-mode 'company-capf 'company-files 'company-yasnippet 'company-dabbrev-code 'company-dabbrev)
@@ -556,6 +549,26 @@ return nil."
 ;; 
 (setq! imagemagick-types-inhibit '(C HTML HTM INFO M TXT PDF SVG))
 
+(use-package! org-fragtog
+  :after org-roam
+  :hook (org-mode . org-fragtog-mode))
+
+(use-package! lsp-ui
+              :after lsp-mode
+              :config
+              (setq lsp-ui-auto-refresh t))
+
+(use-package! keyfreq
+  :config
+  (require 'keyfreq)
+  (keyfreq-mode 1)
+  (keyfreq-autosave-mode 1))
+
+(use-package! vulpea
+              :after org-roam
+  :hook ((org-roam-db-autosync-mode . vulpea-db-autosync-enable)))
+
+(after! org-roam
 ;; autoflow from https://emacs-china.org/t/autoflow-el/25381
 
 (defvar autoflow-list nil)
@@ -628,7 +641,6 @@ return nil."
                    (shell-command (concat "cd " org-directory " && make go")))
                  )
 
-(after! org-roam
 
   (require 'find-lisp)
   (defun hugo-page-publish (file)
@@ -643,27 +655,6 @@ return nil."
     (dolist (f (org-roam--list-files org-roam-directory))
       (hugo-page-publish f)
       ))
-  )
-
-(use-package! org-fragtog
-  :after org
-  :hook (org-mode . org-fragtog-mode))
-
-(use-package! lsp-ui
-              :config
-              (setq lsp-ui-auto-refresh t))
-
-(use-package! keyfreq
-  :config
-  (require 'keyfreq)
-  (keyfreq-mode 1)
-  (keyfreq-autosave-mode 1))
-
-(use-package! vulpea
-  :hook ((org-roam-db-autosync-mode . vulpea-db-autosync-enable)))
-
-(after! org-roam
-
   ;;* dynamic agenda https://github.com/brianmcgillion/doomd/blob/master/config.org
   ;; https://d12frosted.io/posts/2021-01-16-task-management-with-roam-vol5.html
   ;; The 'roam-agenda' tag is used to tell vulpea that there is a todo item in this file

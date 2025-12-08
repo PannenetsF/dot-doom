@@ -14,10 +14,17 @@
 ;;      Alternatively, press 'gd' (or 'C-c c d') on a module to browse its
 ;;      directory (for easy access to its source code).
 
+;; needs to clone the repo with LIBS
+;;   LIBRARY_PATH=$/opt/homebrew/opt/gcc/lib/gcc/15/:\
+;;   /opt/homebrew/opt/libgccjit/lib/gcc/15:\
+;;   /opt/homebrew/opt/gcc/lib/gcc/15/gcc/aarch64-apple-darwin23/15 \
+;;   make
 ;; (add-to-list 'load-path PATH)
-;; (require 'benchmark-init)
+;; (require 'benchmark-init-loaddefs)
 ;; ;; To disable collection of benchmark data after init is done.
+;; (benchmark-init/activate)
 ;; (add-hook 'after-init-hook 'benchmark-init/deactivate)
+
 
 
 (doom! :input
