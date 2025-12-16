@@ -204,8 +204,8 @@
   (setq org-roam-dailies-directory "weekbook/")
   (setq org-roam-dailies-capture-templates
         '(
-          ("d" "Weekbook" entry "** %?"
-           :target (file+head+olp "%<%Y-week%U>.org" "#+title: %<%Y-week%U>\n\n* Meta\n[[id:9805d1e5-5d2c-4547-bbef-411609ec6649][TAG-Workbook]]\n" ("Weekbook" "%<%A/week%U %Y-%m-%d>"))
+         ("d" "Weekbook" plain "%?"
+           :target (file+head+olp "%<%Y-week%U>.org" "#+title: %<%Y-week%U>\n" ("Weekbook" "%<%A/week%U %Y-%m-%d>"))
            :unnarrowed t
            )
           )
