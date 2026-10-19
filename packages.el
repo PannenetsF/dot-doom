@@ -93,3 +93,8 @@
 
 (package! vulpea
   :recipe (:host github :repo "d12frosted/vulpea" :files ("*.el")))
+
+;; Doom dropped the :lang org +pomodoro and +hugo flags in 25.04, so
+;; the packages must be declared explicitly (config.el customizes both).
+(package! org-pomodoro)
+(package! ox-hugo)
