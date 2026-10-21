@@ -98,3 +98,9 @@
 ;; the packages must be declared explicitly (config.el customizes both).
 (package! org-pomodoro)
 (package! ox-hugo)
+
+;; `names' (a build-time macro dep pulled in by pyim's MELPA metadata)
+;; registers autoloads written with the obsolete `defadvice' macro,
+;; which prints two startup warnings on Emacs 31. Its autoloads are not
+;; needed at runtime -- dependent code is already macroexpanded.
+(package! names :recipe (:build (:not autoloads)))

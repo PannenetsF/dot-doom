@@ -181,7 +181,7 @@
                             process-environment)
                          process-environment)))
                   (apply #'call-process "make" nil nil nil "clean" args)
-                  (apply #'call-process "make" nil nil nil args))))))))))
+                  (apply #'call-process "make" nil nil nil args)))))))))
   (advice-add 'liberime-load :before #'+liberime-ensure-module-h))
 
 ;; 2. disable the framebar
