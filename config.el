@@ -107,14 +107,15 @@
 (setq which-key-idle-delay 0.1)
 
 ;; Preheat lazy packages on first idle. Doom defers much of startup to the
-;; first command: pyim (the :input chinese module) loads via
-;; `:after-call pre-command-hook', and python's conda/pyvenv stack (which drags
-;; in eshell/tramp) loads with the first python buffer. Even with native-comp,
-;; the require cost (~0.5-1s) lands on the first keypress after startup --
-;; typically the first j/k. Loading on the first idle second moves that cost
-;; off the keypress; running one throwaway Evil motion also warms the lazy
+;; first command/first feature use: pyim (the :input chinese module) loads
+;; via `:after-call pre-command-hook', python's conda/pyvenv stack drags in
+;; eshell/tramp with the first python buffer, treemacs (SPC e) and lsp-mode
+;; each cost 0.7-1.1s on first use. Even with native-comp, those require
+;; costs land on a keypress. Loading on the first idle second moves them off
+;; the interaction; running one throwaway Evil motion also warms the lazy
 ;; machinery of the first command (evil-goggles/pulse, evil-easymotion,
-;; orderless, company-capf, keymap normalization).
+;; orderless, company-capf, keymap normalization). vc-git/tramp-gvfs cover
+;; treemacs' buffer-creation path so SPC e is warm end to end.
 (defun +preheat-lazy-packages-h ()
   (ignore-errors
     (require 'evil)
@@ -123,6 +124,12 @@
     (when (modulep! :lang python)
       (require 'conda)
       (require 'pyvenv))
+    (when (modulep! :ui treemacs)
+      (require 'treemacs)
+      (require 'vc-git)
+      (require 'tramp-gvfs))
+    (when (modulep! :tools lsp)
+      (require 'lsp-mode))
     (with-temp-buffer
       (evil-local-mode 1)
       (evil-normal-state 1)
