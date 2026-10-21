@@ -106,6 +106,33 @@
 ;; 1. the which-key delay is set to 0.1 seconds, which means that the key hints
 (setq which-key-idle-delay 0.1)
 
+;; Preheat lazy packages on first idle. Doom defers much of startup to the
+;; first command: pyim (the :input chinese module) loads via
+;; `:after-call pre-command-hook', and python's conda/pyvenv stack (which drags
+;; in eshell/tramp) loads with the first python buffer. Even with native-comp,
+;; the require cost (~0.5-1s) lands on the first keypress after startup --
+;; typically the first j/k. Loading on the first idle second moves that cost
+;; off the keypress; running one throwaway Evil motion also warms the lazy
+;; machinery of the first command (evil-goggles/pulse, evil-easymotion,
+;; orderless, company-capf, keymap normalization).
+(defun +preheat-lazy-packages-h ()
+  (ignore-errors
+    (require 'evil)
+    (when (modulep! :input chinese)
+      (require 'pyim))
+    (when (modulep! :lang python)
+      (require 'conda)
+      (require 'pyvenv))
+    (with-temp-buffer
+      (evil-local-mode 1)
+      (evil-normal-state 1)
+      (evil-normalize-keymaps)
+      (execute-kbd-macro "l"))))
+
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (run-with-idle-timer 1 nil #'+preheat-lazy-packages-h)))
+
 ;; 2. disable the framebar
 (add-to-list 'default-frame-alist '(undecorated-round . t))
 
