@@ -133,6 +133,57 @@
           (lambda ()
             (run-with-idle-timer 1 nil #'+preheat-lazy-packages-h)))
 
+;; Rime (liberime) data layout: shared data (default.yaml + luna-pinyin
+;; schemas, deployed by rime/plum) lives in ~/Library/Rime; per-user state
+;; (build caches, user dict) stays in Doom's cache dir.
+(when (modulep! :input chinese +rime)
+  (setq liberime-shared-data-dir "~/Library/Rime")
+  ;; liberime ships a C module that straight does not compile (and on macOS its
+  ;; Makefile falls through to gcc, which is broken under the nix profile).
+  ;; Point liberime at the repo build product and build it on demand with
+  ;; clang; this only runs when the module is missing (fresh checkout or after
+  ;; a `doom upgrade` rebuild).
+  (defun +liberime-ensure-module-h ()
+    (let* ((repo (expand-file-name ".local/straight/repos/liberime/"
+                                   doom-emacs-dir))
+           (module (expand-file-name
+                    (concat "src/liberime-core" module-file-suffix) repo)))
+      (setq liberime-module-file module)
+      (when (and (file-directory-p repo) (not (file-exists-p module)))
+        (ignore-errors
+          (with-temp-buffer
+            (when (zerop (call-process "pkg-config" nil t nil "--cflags" "rime"))
+              (let* ((pc-cflags (string-trim (buffer-string)))
+                     (pc-libs (progn
+                                (erase-buffer)
+                                (and (zerop (call-process "pkg-config" nil t nil
+                                                          "--libs" "rime"))
+                                     (string-trim (buffer-string)))))
+                     (args
+                      `(,(format "CFLAGS=-fPIC -O2 -Wall -DHAVE_RIME_API %s -Iemacs-module/%d"
+                                 pc-cflags emacs-major-version)
+                        ,(format "LDFLAGS=-shared %s" (or pc-libs "-lrime"))
+                        ,(format "EMACS_MAJOR_VERSION=%d" emacs-major-version)
+                        ,@(when (eq system-type 'darwin) '("CC=clang")))))
+                (let ((default-directory repo)
+                      (process-environment
+                       (if (eq system-type 'darwin)
+                           (seq-remove
+                            (lambda (s)
+                              (and (stringp s)
+                                   (string-match-p
+                                    (rx string-start
+                                        (or "NIX_CFLAGS_COMPILE"
+                                            "NIX_LDFLAGS" "CPATH"
+                                            "LIBRARY_PATH")
+                                        "=")
+                                    s)))
+                            process-environment)
+                         process-environment)))
+                  (apply #'call-process "make" nil nil nil "clean" args)
+                  (apply #'call-process "make" nil nil nil args))))))))))
+  (advice-add 'liberime-load :before #'+liberime-ensure-module-h))
+
 ;; 2. disable the framebar
 (add-to-list 'default-frame-alist '(undecorated-round . t))
 
