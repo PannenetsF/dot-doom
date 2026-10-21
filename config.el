@@ -189,7 +189,59 @@
                          process-environment)))
                   (apply #'call-process "make" nil nil nil "clean" args)
                   (apply #'call-process "make" nil nil nil args)))))))))
-  (advice-add 'liberime-load :before #'+liberime-ensure-module-h))
+  (advice-add 'liberime-load :before #'+liberime-ensure-module-h)
+
+  ;; liberime 0.0.11 runs `liberime-search' on an EPHEMERAL session (older
+  ;; releases composed on the shared default session). pyim 5.3.6's
+  ;; `pyim-liberime--get-code' -- called by `pyim-process-select-word', i.e.
+  ;; every space/digit candidate commit -- still expects the follow-up
+  ;; `liberime-get-preedit' (which reads the default session) to see what was
+  ;; just searched, so it hands nil to `split-string' and every commit dies
+  ;; with (wrong-type-argument stringp nil). Redo the lookup inside one
+  ;; explicit temporary session, passed via the new SESSION argument.
+  (after! pyim-liberime
+    (defun +pyim-rime-get-code-a (orig word input &rest _)
+      (if (and (fboundp 'liberime-session-create)
+               (fboundp 'liberime-session-destroy)
+               (stringp word) (stringp input)
+               (string-match-p
+                (string-join
+                 '("pinyin" "luna" "terra" "bopomofo" "stenotype"
+                   "jyut6ping3" "wugniu" "soutzoe" "zyenpheng"
+                   "sampheng" "clover")
+                 "\\|")
+                (or (alist-get 'schema_id (liberime-get-status)) "")))
+          (condition-case _
+              (let* ((sid (liberime-session-create))
+                     (preedit-for
+                      (lambda (s)
+                        (liberime-search s 1 nil nil nil sid)
+                        (or (alist-get
+                             'preedit
+                             (alist-get 'composition
+                                        (liberime-get-context sid)))
+                            "")))
+                     (n (length word))
+                     (syllables (split-string (funcall preedit-for input)
+                                              "[ ']+"))
+                     (target (cl-subseq syllables 0
+                                        (min n (length syllables))))
+                     (i (min (length input) (* n 5)))
+                     str)
+                (unwind-protect
+                    (while (> i 0)
+                      (setq str (substring input 0 i))
+                      (if (equal target
+                                 (split-string (funcall preedit-for str)
+                                               "[ ']+"))
+                          (setq i 0)
+                        (setq i (1- i))))
+                  (liberime-session-destroy sid))
+                (or str input))
+            (error input))
+        (funcall orig word input)))
+    (advice-add 'pyim-liberime--get-code :around
+                #'+pyim-rime-get-code-a)))
 
 ;; 2. disable the framebar
 (add-to-list 'default-frame-alist '(undecorated-round . t))
