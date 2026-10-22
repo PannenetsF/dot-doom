@@ -917,23 +917,32 @@ tasks."
   ;; a nix-profile gmake/pkgconf leaks NIX_CFLAGS_COMPILE into the
   ;; compile and the link fails (same failure mode as the liberime
   ;; self-heal above).
-  (defun +telega-ensure-server-h ()
-    (unless (or telega-use-docker
-                (let ((exec-path (cons telega-directory exec-path)))
-                  (executable-find telega-server-command)))
-      (let ((process-environment
-             (cons "PATH=/opt/homebrew/bin:/usr/bin:/bin"
-                   (seq-remove
-                    (lambda (s)
-                      (and (stringp s)
-                           (string-match-p
-                            (rx string-start
-                                (or "NIX_CFLAGS_COMPILE" "NIX_LDFLAGS"
-                                    "CPATH" "LIBRARY_PATH")
-                                "=")
-                            s)))
-                    process-environment))))
-        (telega-server-build ""))))
+  ;; Advice receives the prefix argument passed to `telega', so declare
+  ;; the optional argument instead of letting the before-advice signal
+  ;; `wrong-number-of-arguments' before telega itself runs.
+  (defun +telega-ensure-server-h (&optional _arg)
+    (let* ((exec-path (cons telega-directory exec-path))
+           (server-bin (executable-find telega-server-command)))
+      ;; Rebuild when the helper is missing OR cannot start (e.g. its
+      ;; libtdjson dylib was replaced by a tdlib upgrade). Beware: on
+      ;; signal death `call-process' returns a string ("Abort trap: 6")
+      ;; rather than an integer exit status, so only exact 0 counts.
+      (unless (or telega-use-docker
+                  (eq 0 (and server-bin
+                             (call-process server-bin nil nil nil "-h"))))
+        (let ((process-environment
+               (cons "PATH=/opt/homebrew/bin:/usr/bin:/bin"
+                     (seq-remove
+                      (lambda (s)
+                        (and (stringp s)
+                             (string-match-p
+                              (rx string-start
+                                  (or "NIX_CFLAGS_COMPILE" "NIX_LDFLAGS"
+                                      "CPATH" "LIBRARY_PATH")
+                                  "=")
+                              s)))
+                      process-environment))))
+          (telega-server-build "")))))
   (advice-add 'telega :before #'+telega-ensure-server-h))
 
 (map! :leader
