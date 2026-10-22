@@ -78,6 +78,111 @@
 ;; `load-theme' function. This is the default:
 (setq doom-theme 'doom-ayu-dark)
 
+;; In a terminal frame (-nw) the palette belongs to the terminal, not to
+;; Emacs — the same reason herdr pins `[theme] name = "terminal"`. Kitty
+;; auto-switches its dark/light palette with macOS appearance (and the
+;; kitty-theme picker can override it), so probe the terminal's *live*
+;; background color and pick the matching ayu theme instead of forcing
+;; the dark one. GUI frames keep `doom-ayu-dark' above.
+(when (not (display-graphic-p))
+  (defvar +terminal-dark-theme 'doom-ayu-dark)
+  (defvar +terminal-light-theme 'doom-ayu-light)
+
+  (defun +terminal--kitty-sockets ()
+    "Reachable kitty control sockets, env hint first then /tmp newest.
+Mirrors config/kitty/kitty-theme.sh: a herdr pane can outlive the kitty
+it was launched from, so its KITTY_LISTEN_ON may be stale."
+    (let* ((hint (when-let ((h (getenv "KITTY_LISTEN_ON")))
+                   (string-remove-prefix "unix:" h)))
+           (tmp-socks (sort (seq-filter #'file-exists-p
+                                        (directory-files "/tmp" t
+                                                         "^kitty-[0-9]+$"))
+                            (lambda (a b)
+                              (time-less-p (nth 5 (file-attributes b))
+                                           (nth 5 (file-attributes a)))))))
+      ;; Env hint first; remaining sockets newest-first (lexicographic
+      ;; ordering is wrong for kitty-9 vs kitty-10).
+      (delete-dups (if hint (cons hint tmp-socks) tmp-socks))))
+
+  (defun +terminal--live-background ()
+    "Return the terminal background as a 6-digit hex string, or nil."
+    (or (when (executable-find "kitty")
+          (cl-dolist (sock (+terminal--kitty-sockets))
+            (with-temp-buffer
+              (when (and (zerop (ignore-errors
+                                  (call-process "kitty" nil t nil
+                                                "@" "--to"
+                                                (concat "unix:" sock)
+                                                "get-colors")))
+                         (progn (goto-char (point-min))
+                                (re-search-forward
+                                 "^background[[:space:]]+#\\([0-9a-fA-F]\\{6\\}\\)"
+                                 nil t)))
+                (cl-return (match-string 1))))))
+        ;; COLORFGBG=<fg>;<bg-index> exported by some terminals.
+        (let ((cfgbg (getenv "COLORFGBG")))
+          (when (and cfgbg (string-match ";\\([0-9]+\\)\\s-*\\'" cfgbg))
+            (if (< (string-to-number (match-string 1 cfgbg)) 8)
+                "000000" "ffffff")))
+        ;; Last resort: macOS system appearance (kitty auto mode follows it).
+        (when (eq system-type 'darwin)
+          (if (zerop (ignore-errors
+                       (call-process "defaults" nil nil nil
+                                     "read" "-g" "AppleInterfaceStyle")))
+              "000000" "ffffff"))))
+
+  (defun +terminal--luminance (hex)
+    "Relative luminance (0..1) of a 6-digit srgb hex string."
+    (let* ((chan (lambda (i)
+                   (/ (string-to-number (substring hex i (+ i 2)) 16)
+                      255.0)))
+           (linear (lambda (c)
+                     (if (<= c 0.03928) (/ c 12.92)
+                       (expt (/ (+ c 0.055) 1.055) 2.4))))
+           (r (funcall linear (funcall chan 0)))
+           (g (funcall linear (funcall chan 2)))
+           (b (funcall linear (funcall chan 4))))
+      (+ (* 0.2126 r) (* 0.7152 g) (* 0.0722 b))))
+
+  (defvar +terminal--theme-last-bg nil)
+  (defvar +terminal--theme-last-check 0)
+  (defun +terminal-sync-theme (&rest _)
+    "Switch the active ayu theme to match the terminal background.
+Re-checked at startup and whenever the tty frame regains focus (with
+a 2s debounce), so a macOS dark/light flip lands on next focus. No-op
+when detection fails or the palette has not changed."
+    (interactive)
+    (when (and (not (display-graphic-p))
+               (> (float-time) (+ +terminal--theme-last-check 2.0))
+               (let ((bg (+terminal--live-background)))
+                 (and bg
+                      (not (equal bg +terminal--theme-last-bg))
+                      (setq +terminal--theme-last-bg bg)
+                      (setq +terminal--theme-last-check (float-time))
+                      bg)))
+      (let* ((bg (or +terminal--theme-last-bg "000000"))
+             (want (if (< (+terminal--luminance bg) 0.5)
+                       +terminal-dark-theme
+                     +terminal-light-theme)))
+        (unless (eq want doom-theme)
+          (setq doom-theme want)
+          (mapc #'disable-theme custom-enabled-themes)
+          (load-theme want t)
+          (message "Terminal palette changed to #%s; using %s" bg want)))))
+
+  ;; Pick the theme before Doom applies `doom-theme' at startup.
+  (when-let ((bg (+terminal--live-background)))
+    (setq +terminal--theme-last-bg bg)
+    (setq doom-theme
+          (if (< (+terminal--luminance bg) 0.5)
+              +terminal-dark-theme
+            +terminal-light-theme)))
+  ;; Kitty reports tty focus events; reappearance flips happen while
+  ;; Emacs is unfocused, so re-sync on the way back in.
+  (add-hook 'after-init-hook
+            (lambda () (add-hook 'focus-in-hook #'+terminal-sync-theme))))
+
+
 ;; This determines the style of line numbers in effect. If set to `nil', line
 ;; numbers are disabled. For relative line numbers, set this to `relative'.
 (setq display-line-numbers-type 'relative)
