@@ -104,3 +104,12 @@
 ;; which prints two startup warnings on Emacs 31. Its autoloads are not
 ;; needed at runtime -- dependent code is already macroexpanded.
 (package! names :recipe (:build (:not autoloads)))
+
+;; Telegram client. telega-server (server/) is a C helper linked against
+;; Homebrew tdlib, built on first telega launch by the self-heal hook in
+;; config.el. The root Makefile drives `gmake server-reinstall' from the
+;; straight build directory, so both must be in :files (the MELPA recipe
+;; ships them; a bare straight recipe would silently drop the Makefile).
+(package! telega
+  :recipe (:host github :repo "zevlg/telega.el"
+           :files ("*.el" "etc" "server" "Makefile")))

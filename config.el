@@ -882,3 +882,43 @@ tasks."
   (advice-add 'org-agenda-files :filter-return #'dynamic-agenda-files-advice)
 
   )
+
+;; telega — Telegram client. Doom's doom+ module tree no longer ships an
+;; `:app telega' module, so it is a plain package declared in
+;; packages.el. Its C helper telega-server links -ltdjson; Homebrew
+;; installs tdlib under /opt/homebrew (upstream's default /usr/local is
+;; the Intel-era path).
+(when (eq system-type 'darwin)
+  (setq telega-server-libs-prefix "/opt/homebrew/opt/tdlib"))
+
+(use-package! telega
+  :defer t
+  :init
+  ;; Fresh clones and `doom upgrade' checkouts lack the telega-server
+  ;; binary; upstream's `telega-server--ensure-build' would drop into a
+  ;; y-or-n prompt on first launch, so build it noninteractively before
+  ;; `telega' starts. Pin the build environment to Xcode CLT + Homebrew:
+  ;; a nix-profile gmake/pkgconf leaks NIX_CFLAGS_COMPILE into the
+  ;; compile and the link fails (same failure mode as the liberime
+  ;; self-heal above).
+  (defun +telega-ensure-server-h ()
+    (unless (or telega-use-docker
+                (let ((exec-path (cons telega-directory exec-path)))
+                  (executable-find telega-server-command)))
+      (let ((process-environment
+             (cons "PATH=/opt/homebrew/bin:/usr/bin:/bin"
+                   (seq-remove
+                    (lambda (s)
+                      (and (stringp s)
+                           (string-match-p
+                            (rx string-start
+                                (or "NIX_CFLAGS_COMPILE" "NIX_LDFLAGS"
+                                    "CPATH" "LIBRARY_PATH")
+                                "=")
+                            s)))
+                    process-environment))))
+        (telega-server-build ""))))
+  (advice-add 'telega :before #'+telega-ensure-server-h))
+
+(map! :leader
+      :desc "Telega" "o t" #'telega)
