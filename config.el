@@ -33,14 +33,30 @@
 (make-directory org-directory t)
 
 ;; Keep in sync with kitty's font_family/font_size in
-;; nix-hm: config/kitty/kitty.conf (Iosevka NF, 16.0). CoreText exposes
-;; the family as "Iosevka Nerd Font" to Emacs.
-(setq doom-font (font-spec :family "Iosevka Nerd Font" :size 16))
+;; nix-hm: config/kitty/kitty.conf (Sarasa Term SC, 16.0). Sarasa pairs
+;; Iosevka-Term-shaped Latin with Source Han Sans CJK on a strict
+;; 500/1000 grid, so mixed CN/EN text is truly 2:1 aligned (Iosevka NF's
+;; 600-wide Latin did not match LXGW Mono's 1000-wide CJK fallback).
+(setq doom-font (font-spec :family "Sarasa Term SC" :size 16))
 (setq use-default-font-for-symbols nil)
 
 (defun private-cjk-font()
-  (dolist (charset '(kana han cjk-misc symbol bopomofo))
-    (set-fontset-font t charset (font-spec :family "LXGW WenKai Mono"))))
+  ;; Sarasa Term SC covers CJK itself on the strict 500/1000 grid, so
+  ;; list it first explicitly and append LXGW only for glyphs Sarasa
+  ;; lacks.
+  (dolist (charset '(kana han cjk-misc bopomofo))
+    (set-fontset-font t charset (font-spec :family "Sarasa Term SC"))
+    (set-fontset-font t charset (font-spec :family "LXGW WenKai Mono") nil t))
+  ;; `symbol' charset (… U+2026, ™, μ, curly quotes, arrows, ⋯) has a
+  ;; built-in fontset mapping that on macOS resolves to the PROPORTIONAL
+  ;; "Apple Symbols" face and takes precedence over the default face —
+  ;; Emacs counts those glyphs as one cell while the face paints 1.5-2
+  ;; cells, so any which-key truncated entry pushes every later column
+  ;; out of alignment. Pin the charset to the monospaced Sarasa first;
+  ;; Apple Symbols stays appended only for the rare glyph Sarasa lacks
+  ;; (harmless on Linux: the nonexistent family is simply skipped).
+  (set-fontset-font t 'symbol (font-spec :family "Sarasa Term SC"))
+  (set-fontset-font t 'symbol (font-spec :family "Apple Symbols") nil t))
 
 (add-hook 'after-setting-font-hook #'private-cjk-font)
 
