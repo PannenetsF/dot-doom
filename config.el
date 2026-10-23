@@ -261,6 +261,22 @@ when detection fails or the palette has not changed."
           (lambda ()
             (run-with-idle-timer 1 nil #'+preheat-lazy-packages-h)))
 
+;; Push xref's marker stack before navigation commands that bypass xref
+;; (`find-function', `consult-imenu', `consult-ripgrep', `citre-jump'), so
+;; `M-,' (`xref-pop-marker-stack') can return from them. xref's own
+;; find-definitions pushes automatically; these commands don't, so without
+;; this advice the stack stays empty and `M-,' errors with "No previous
+;; location". citre may be absent — advising an undefined function is
+;; harmless and activates if citre is installed later.
+(after! xref
+  (setq xref-search-program 'ripgrep
+        xref-history-storage 'xref-window-local-history))
+
+(defadvice! +xref--push-marker-stack-a (&rest _)
+  "Push xref's marker stack before navigation commands that bypass xref."
+  :before '(find-function consult-imenu consult-ripgrep citre-jump)
+  (xref-push-marker-stack (point-marker)))
+
 ;; Rime (liberime) data layout: shared data (default.yaml + luna-pinyin
 ;; schemas, deployed by rime/plum) lives in ~/Library/Rime; per-user state
 ;; (build caches, user dict) stays in Doom's cache dir.
@@ -444,6 +460,18 @@ when detection fails or the palette has not changed."
 
   (dolist (lig +ligatures-alist)
     (ligature-set-ligatures (car lig) (cdr lig)))
+
+  ;; Allow CJK characters and full-width punctuation next to emphasis
+  ;; markers, so *粗体* and /斜体/ render in Chinese text.  ASCII letters
+  ;; stay excluded so paths and identifiers aren't treated as emphasis.
+  (setq org-emphasis-regexp-components
+        '("-[:space:]('\"{[:nonascii:]"
+          "-[:space:].,:!?;'\")}\\[[:nonascii:]"
+          "[:space:]"
+          "."
+          1))
+  (org-set-emph-re 'org-emphasis-regexp-components
+                   org-emphasis-regexp-components)
   )
 
 (use-package! org-pomodoro 
@@ -793,6 +821,58 @@ return nil."
 (setq auto-save-visited-interval 5)
 (auto-save-visited-mode +1)
 
+;; Lazy auto-revert: instead of `global-auto-revert-mode' polling every buffer
+;; on a timer, revert only when a buffer becomes relevant — window change,
+;; window selection, frame focus, or after saving. A stale buffer that is
+;; never visible never costs anything.
+(use-package! autorevert
+  :config
+  (setq auto-revert-verbose t
+        auto-revert-use-notify nil
+        auto-revert-stop-on-user-input nil
+        ;; Only prompts for confirmation when buffer is unsaved.
+        revert-without-query (list "."))
+
+  (defun +auto-revert-buffer-h (&rest _)
+    "Auto revert current buffer when it is stale."
+    (unless (or (active-minibuffer-window)
+                (and (not auto-revert-remote-files)
+                     buffer-file-name
+                     (file-remote-p buffer-file-name)))
+      (let ((auto-revert-mode t))
+        (auto-revert-handler))))
+
+  (defun +auto-revert-window-buffer-h (window &rest _)
+    "Auto revert WINDOW's buffer when it is stale."
+    (when (window-live-p window)
+      (with-current-buffer (window-buffer window)
+        (+auto-revert-buffer-h))))
+
+  (defun +auto-revert-selected-window-h (&optional frame)
+    "Auto revert the selected window's buffer in FRAME."
+    (+auto-revert-window-buffer-h
+     (frame-selected-window (or frame (selected-frame)))))
+
+  (defun +auto-revert-visible-buffers-h (&rest _)
+    "Auto revert visible stale buffers."
+    (dolist (buffer (delete-dups (mapcar #'window-buffer (window-list-1 nil 'no-minibuf t))))
+      (with-current-buffer buffer
+        (+auto-revert-buffer-h))))
+
+  (define-minor-mode +auto-revert-mode
+    "A lazy alternative to `global-auto-revert-mode'."
+    :global t
+    (when global-auto-revert-mode
+      (setq +auto-revert-mode nil))
+    (let ((fn (if +auto-revert-mode #'add-hook #'remove-hook)))
+      (funcall fn 'window-buffer-change-functions #'+auto-revert-window-buffer-h)
+      (funcall fn 'window-selection-change-functions #'+auto-revert-selected-window-h)
+      (funcall fn 'focus-in-hook #'+auto-revert-visible-buffers-h)
+      (funcall fn 'after-save-hook #'+auto-revert-visible-buffers-h)
+      (funcall fn 'server-switch-hook #'+auto-revert-buffer-h)))
+
+  (+auto-revert-mode +1))
+
 ;; for dired
 (map! :map dirvish-mode-map
       :n "+" #'dired-create-empty-file)
@@ -803,6 +883,21 @@ return nil."
   ;; for prog
   (set-company-backend! 'prog-mode 'company-capf 'company-files 'company-yasnippet 'company-dabbrev-code 'company-dabbrev)
   )
+
+;; Per-category completion styles. The completion/vertico module already
+;; makes orderless the global default and overrides the `file' category.
+;; lsp-mode tags its candidates with the `lsp-capf' category and, through
+;; `lsp-completion-mode', installs a buffer-local `lsp-passthrough' style
+;; for it so the server's own filtering/sorting is preserved verbatim.
+;; Override that to orderless: LSP servers return a broad prefix-matched
+;; set, and client-side orderless narrowing within it beats strict
+;; passthrough. `completion-category-overrides' is consulted before the
+;; buffer-local `completion-category-defaults' lsp-mode sets, so this
+;; wins without touching lsp-mode itself.
+(when (modulep! :tools lsp)
+  (after! orderless
+    (setf (alist-get 'lsp-capf completion-category-overrides)
+          '((styles orderless)))))
 
 ;; fix ein 
 (after! ein
@@ -824,6 +919,187 @@ return nil."
               :after lsp-mode
               :config
               (setq lsp-ui-auto-refresh t))
+
+;; [compile] Compilation buffer as a Flymake diagnostic backend. When
+;; `compile' (or `+make/run') finishes, the buffer's parsed messages are
+;; re-published as Flymake diagnostics: build errors/warnings then show in
+;; the fringe of every affected file AND in the project-wide listing
+;; (`flymake-show-project-diagnostics'), not just as hyperlinks inside the
+;; compilation buffer. State is in-memory only (no persistence), matching
+;; the upstream technique.
+(use-package! compile
+  :preface
+  (defvar +compilation-flymake-diagnostics nil
+    "Flymake diagnostics parsed from the latest compilation buffer.")
+
+  (defun +compilation-flymake--file (location)
+    "Return the file named by compilation LOCATION."
+    (let* ((file-struct (compilation--loc->file-struct location))
+           (file-spec (compilation--file-struct->file-spec file-struct))
+           (file (car file-spec)))
+      (if (bufferp file)
+          (buffer-file-name file)
+        (compilation--expand-fn
+         (or (cadr file-spec) default-directory)
+         (format (or (car (compilation--file-struct->formats file-struct))
+                     "%s")
+                 file)))))
+
+  (defun +compilation-flymake--message-start (message position)
+    "Return the beginning of parsed MESSAGE around POSITION.
+Compilation text properties may cover only a hyperlink inside the full
+parser match, so recover the complete match from MESSAGE's parser rule."
+    (let* ((rule (compilation--message->rule message))
+           (item (and rule
+                      (cdr (assq rule compilation-error-regexp-alist-alist))))
+           (regexp (car-safe item)))
+      (or (and (stringp regexp)
+               (save-excursion
+                 (goto-char position)
+                 (end-of-line)
+                 (when (and (re-search-backward regexp nil t)
+                            (<= (match-beginning 0) position)
+                            (<= position (match-end 0)))
+                   (match-beginning 0))))
+          (save-excursion
+            (goto-char position)
+            (line-beginning-position)))))
+
+  (defun +compilation-flymake--collect ()
+    "Convert the current compilation buffer's parsed message cache."
+    (save-excursion
+      (let ((entries
+             (progn
+               (goto-char (point-min))
+               (cl-loop
+                with seen = (make-hash-table :test #'eq)
+                for match = (text-property-search-forward
+                             'compilation-message nil nil t)
+                while match
+                for message = (prop-match-value match)
+                for location = (compilation--message->loc message)
+                for type = (compilation--message->type message)
+                for position = (+compilation-flymake--message-start
+                                message (prop-match-beginning match))
+                ;; Informational locations usually provide context for the
+                ;; preceding warning or error, rather than a separate
+                ;; diagnostic.  Keep them in that diagnostic's text range.
+                unless (or (zerop type) (gethash message seen))
+                collect (progn
+                          (puthash message t seen)
+                          (vector location type position))))))
+        (cl-loop
+         for tail on entries
+         for entry = (car tail)
+         for next = (cadr tail)
+         for location = (aref entry 0)
+         for type = (aref entry 1)
+         for position = (aref entry 2)
+         for end = (if next (aref next 2) (point-max))
+         collect
+         (flymake-make-diagnostic
+          (+compilation-flymake--file location)
+          (cons (or (compilation--loc->line location) 1)
+                (compilation--loc->col location))
+          nil
+          (if (= type 1) 'flymake-warning 'flymake-error)
+          (save-excursion
+            (goto-char position)
+            (string-trim
+             (buffer-substring-no-properties
+              (line-beginning-position) end)))
+          '+compilation-flymake)))))
+
+  (defun +compilation-flymake--publish-project-diagnostics ()
+    "Replace Compilation-owned project diagnostics."
+    (setq flymake-list-only-diagnostics
+          (cl-loop for (file . diagnostics) in flymake-list-only-diagnostics
+                   for others = (cl-remove '+compilation-flymake diagnostics
+                                           :key #'flymake-diagnostic-data)
+                   when others collect (cons file others)))
+    (dolist (diagnostic +compilation-flymake-diagnostics)
+      (push diagnostic
+            (alist-get (flymake-diagnostic-buffer diagnostic)
+                       flymake-list-only-diagnostics nil nil #'equal))))
+
+  (defun +compilation-flymake-backend (report-fn &rest _args)
+    "Report compilation diagnostics belonging to the current buffer.
+Diagnostics for all files are published separately for project listings."
+    (let (diagnostics)
+      (dolist (cached +compilation-flymake-diagnostics)
+        (when (and buffer-file-name
+                   (file-equal-p buffer-file-name
+                                 (flymake-diagnostic-buffer cached)))
+          (when-let* ((position (flymake-diagnostic-beg cached))
+                      (region (flymake-diag-region
+                               (current-buffer)
+                               (car position) (cdr position))))
+            (push (flymake-make-diagnostic
+                   (current-buffer) (car region) (cdr region)
+                   (flymake-diagnostic-type cached)
+                   (flymake-diagnostic-message cached))
+                  diagnostics))))
+      (funcall report-fn (nreverse diagnostics))))
+
+  (defun +compilation-flymake-finish-h (buffer _status)
+    "Publish the parsed messages from compilation BUFFER."
+    (require 'flymake)
+    (let ((old-files (mapcar #'flymake-diagnostic-buffer
+                             +compilation-flymake-diagnostics)))
+      (setq +compilation-flymake-diagnostics
+            (with-current-buffer buffer
+              (+compilation-flymake--collect)))
+      (+compilation-flymake--publish-project-diagnostics)
+      (dolist (file (delete-dups
+                     (append old-files
+                             (mapcar #'flymake-diagnostic-buffer
+                                     +compilation-flymake-diagnostics))))
+        (when-let* ((source (find-buffer-visiting file)))
+          (with-current-buffer source
+            (when flymake-mode
+              (flymake-start)))))))
+
+  :config
+  (setq compilation-always-kill t       ; kill compilation process before starting another
+        compilation-ask-about-save nil  ; save all buffers on `compile'
+        compilation-scroll-output 'first-error)
+
+  ;; Automatically truncate compilation buffers so they don't accumulate too
+  ;; much data and bog down the rest of Emacs.
+  (autoload 'comint-truncate-buffer "comint" nil t)
+  (add-hook! compilation-filter-hook
+    (defun +compilation--truncate-buffer-h (&optional _string)
+      "Rate-limit `comint-truncate-buffer' in compilation buffers."
+      (require 'comint)
+      (when (> (buffer-size)
+               (* 80 comint-buffer-maximum-size))
+        (let ((gc-cons-threshold most-positive-fixnum)
+              (gc-cons-percentage 1.0))
+          (with-silent-modifications
+            (comint-truncate-buffer))))))
+
+  (add-hook! compilation-filter-hook
+    (defun +compilation--colorize-h ()
+      "Apply ANSI color codes to the compilation buffer."
+      (require 'ansi-color)
+      (let ((inhibit-read-only t))
+        (ansi-color-apply-on-region compilation-filter-start (point)))))
+
+  (add-hook 'compilation-finish-functions #'+compilation-flymake-finish-h))
+
+;; Doom's plain :checkers syntax enables flycheck only -- flymake is off by
+;; default, so the backend above would be defined but never run. Enable
+;; flymake in prog buffers and register the backend buffer-locally (mirrors
+;; the upstream [flymake] block). lsp keeps publishing through flycheck
+;; (left fringe); flymake takes the right fringe for compilation
+;; diagnostics, so the two never share a bitmap slot.
+(defun +compilation-flymake-setup-h ()
+  "Enable Flymake with the Compilation backend in prog buffers."
+  (add-hook 'flymake-diagnostic-functions
+            #'+compilation-flymake-backend nil t)
+  (flymake-mode 1))
+
+(add-hook! 'prog-mode-hook #'+compilation-flymake-setup-h)
 
 (use-package! keyfreq
   :config
@@ -1052,3 +1328,34 @@ tasks."
 
 (map! :leader
       :desc "Telega" "o t" #'telega)
+
+;; Exclude code/markup spans from prose spell-checking. Doom's spell module
+;; already skips org PROPERTIES/LOGBOOK drawers and #+BEGIN_SRC/EXAMPLE
+;; blocks globally, so these hooks add only the inline markup it doesn't
+;; cover: org ~code~/=verbatim=, Markdown backticks/template vars, and
+;; LaTeX spans in both. `require' first so the buffer-local copy starts
+;; from ispell's defaults plus Doom's global entries, regardless of hook
+;; order or whether flyspell is enabled in the buffer.
+(defun +ispell-org-skip-regions-h ()
+  "Exclude Org inline code/verbatim and LaTeX from spell checking."
+  (require 'ispell)
+  (make-local-variable 'ispell-skip-region-alist)
+  (dolist (pair '(("~" "~") ("=" "=")
+                  ("\\\\(" "\\\\)") ("\\[" "\\]")
+                  ("^\\\\begin{[^}]+}" "^\\\\end{[^}]+}")))
+    (add-to-list 'ispell-skip-region-alist pair)))
+
+(defun +ispell-markdown-skip-regions-h ()
+  "Exclude Markdown code and inline markup from spell checking."
+  (require 'ispell)
+  (make-local-variable 'ispell-skip-region-alist)
+  (dolist (pair '(("`" "`")
+                  ("^```" "^```")
+                  ("{{" "}}")
+                  ("\\\\(" "\\\\)") ("\\[" "\\]")
+                  ("^\\\\begin{[^}]+}" "^\\\\end{[^}]+}")))
+    (add-to-list 'ispell-skip-region-alist pair)))
+
+(add-hook! 'org-mode-hook #'+ispell-org-skip-regions-h)
+(add-hook! '(markdown-mode-hook markdown-ts-mode-hook)
+           #'+ispell-markdown-skip-regions-h)
