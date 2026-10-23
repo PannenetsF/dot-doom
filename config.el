@@ -506,6 +506,15 @@ when detection fails or the palette has not changed."
           (lambda () (when org-indent-mode (org-indent-mode -1)))
           t)
 
+;; doom-docs-mode--post-hook intentionally disables org-modern-mode
+;; (doom-docs.el:785), claiming it's redundant with doom-docs-view-mode.
+;; Re-enable it after the post-hook runs so documentation files get
+;; the same pretty rendering as regular org files.
+(advice-add 'doom-docs-mode--post-hook :after
+            (lambda (&rest _)
+              (when (derived-mode-p 'org-mode)
+                (org-modern-mode 1))))
+
 (use-package! org-roam
   :after org
   :config
