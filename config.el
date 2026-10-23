@@ -76,7 +76,7 @@
 ;; There are two ways to load a theme. Both assume the theme is installed and
 ;; available. You can either set `doom-theme' or manually load a theme with the
 ;; `load-theme' function. This is the default:
-(setq doom-theme 'doom-ayu-dark)
+(setq doom-theme 'doom-solarized-dark)
 
 ;; In a terminal frame (-nw) the palette belongs to the terminal, not to
 ;; Emacs — the same reason herdr pins `[theme] name = "terminal"`. Kitty
@@ -85,8 +85,8 @@
 ;; background color and pick the matching ayu theme instead of forcing
 ;; the dark one. GUI frames keep `doom-ayu-dark' above.
 (when (not (display-graphic-p))
-  (defvar +terminal-dark-theme 'doom-ayu-dark)
-  (defvar +terminal-light-theme 'doom-ayu-light)
+  (defvar +terminal-dark-theme 'doom-solarized-dark)
+  (defvar +terminal-light-theme 'doom-solarized-light)
 
   (defun +terminal--kitty-sockets ()
     "Reachable kitty control sockets, env hint first then /tmp newest.
