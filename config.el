@@ -440,9 +440,9 @@ when detection fails or the palette has not changed."
         org-agenda-files (directory-files-recursively org-directory "\\.org$")
         org-log-done t
         org-log-into-drawer t
-        ;; roife-style pretty rendering (complements org-modern)
-        org-hide-emphasis-markers t
-        org-pretty-entities t
+        ;; roife-style pretty rendering (complements org-modern;
+        ;; org-hide-emphasis-markers and org-pretty-entities are set
+        ;; by Doom's +pretty contrib)
         org-fontify-whole-heading-line t
         org-fontify-quote-and-verse-blocks t
         org-startup-indented t
@@ -492,11 +492,11 @@ when detection fails or the palette has not changed."
         )
               )
 
-(use-package! org-modern
-  :after org
-  :config
-  (global-org-modern-mode)
-  (setq org-modern-fold-stars '(("▶" . "▼") ("▷" . "▽") ("⏵" . "⏷") ("▹" . "▿") ("▸" . "▾"))))
+;; org-modern is configured by Doom's +pretty contrib (pretty.el);
+;; only add our fold-stars customization here.
+(after! org-modern
+  (setq org-modern-fold-stars
+        '(("▶" . "▼") ("▷" . "▽") ("⏵" . "⏷") ("▹" . "▿") ("▸" . "▾"))))
 
 (use-package! org-roam
   :after org
