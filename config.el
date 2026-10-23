@@ -440,6 +440,13 @@ when detection fails or the palette has not changed."
         org-agenda-files (directory-files-recursively org-directory "\\.org$")
         org-log-done t
         org-log-into-drawer t
+        ;; roife-style pretty rendering (complements org-modern)
+        org-hide-emphasis-markers t
+        org-pretty-entities t
+        org-fontify-whole-heading-line t
+        org-fontify-quote-and-verse-blocks t
+        org-startup-indented t
+        org-ellipsis " …"
         )
     (setq org-mode-ligatures
         '((org-mode "|||>" "<|||" "<==>" "<!--" "####" "~~>" "||=" "||>"
@@ -487,9 +494,8 @@ when detection fails or the palette has not changed."
 
 (use-package! org-modern
   :after org
-  :init 
-  (with-eval-after-load 'org (global-org-modern-mode))
   :config
+  (global-org-modern-mode)
   (setq org-modern-fold-stars '(("▶" . "▼") ("▷" . "▽") ("⏵" . "⏷") ("▹" . "▿") ("▸" . "▾"))))
 
 (use-package! org-roam
