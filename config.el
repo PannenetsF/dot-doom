@@ -442,10 +442,10 @@ when detection fails or the palette has not changed."
         org-log-into-drawer t
         ;; roife-style pretty rendering (complements org-modern;
         ;; org-hide-emphasis-markers and org-pretty-entities are set
-        ;; by Doom's +pretty contrib)
+        ;; by Doom's +pretty contrib. Do NOT enable org-startup-indented:
+        ;; org-modern-hide-stars is auto-disabled when org-indent-mode is on.)
         org-fontify-whole-heading-line t
         org-fontify-quote-and-verse-blocks t
-        org-startup-indented t
         org-ellipsis " …"
         )
     (setq org-mode-ligatures
@@ -497,6 +497,14 @@ when detection fails or the palette has not changed."
 (after! org-modern
   (setq org-modern-fold-stars
         '(("▶" . "▼") ("▷" . "▽") ("⏵" . "⏷") ("▹" . "▿") ("▸" . "▾"))))
+
+;; Doom's +org-init-appearance-h sets org-startup-indented t, which
+;; enables org-indent-mode. org-modern-hide-stars is auto-disabled when
+;; org-indent-mode is on, so heading stars stay visible. Disable
+;; org-indent-mode (run last in org-mode-hook) to let org-modern hide stars.
+(add-hook 'org-mode-hook
+          (lambda () (when org-indent-mode (org-indent-mode -1)))
+          t)
 
 (use-package! org-roam
   :after org
