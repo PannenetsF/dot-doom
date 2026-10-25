@@ -29,6 +29,17 @@
 ;; GUI PATH comes from emacs-plus' EMACS_PLUS_PATH (site-start.el),
 ;; terminal Emacs from the shell - install-doom.sh removes any stale file.
 
+;; lsp-mode bakes its JSON accessor branch (hash-table vs plist) at
+;; compile time from $LSP_USE_PLISTS. Doom's package :env only exports
+;; it to the straight *byte* compiler; Emacs' async native-compile
+;; workers are separate processes that never saw it, so their .eln
+;; shipped the hash-table branch while runtime lsp-use-plists=t -
+;; flycheck then died with "(wrong-type-argument hash-table-p ...)" on
+;; every pyright diagnostic. Set it for runtime (lsp-protocol reads it
+;; via defvar at first load) and for every async compile worker.
+(setenv "LSP_USE_PLISTS" "1")
+(setq native-comp-async-env-modifier-form '(setenv "LSP_USE_PLISTS" "1"))
+
 ;; Resolve notes directories early (before deferred org/org-roam load):
 ;; vulpea's file watcher otherwise sees the ~/org defaults and warns.
 (setq org-directory "~/Documents/org/"
