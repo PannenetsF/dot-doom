@@ -927,6 +927,58 @@ return nil."
     (setf (alist-get 'lsp-capf completion-category-overrides)
           '((styles orderless)))))
 
+;; Neovim-like function completion: accepting a function/method candidate
+;; inserts `()', puts point between the parens, and pops signature help
+;; (the argument list) - mirroring nvim-autopairs/blink in Neovim.
+;;
+;; Where the parens come from: pyright does NOT ship them in the LSP
+;; CompletionItem. Its completionProvider only sets a `funcParensDisabled'
+;; flag in the item's `data' (false for a normal call, true in
+;; imports/type annotations/decorators/overrides) and never assigns
+;; insertText/textEdit for ordinary symbols - the EDITOR is expected to
+;; append the parens. We read the candidate's raw LSP item (kind 2/3/4 =
+;; method/function/constructor) from company's post-completion hook and
+;; insert `()' ourselves, honoring funcParensDisabled and skipping when a
+;; server that DOES emit snippets already wrote a closing paren.
+;;
+;; Two supporting settings:
+;; - `(company +tng)' sets `lsp-enable-snippet' nil from company-tng-mode
+;;   on the first-input hook (Tab can't both accept and navigate snippet
+;;   fields), clobbering any plain setq here. Re-assert it from
+;;   `company-tng-mode-hook', which runs after tng's auto-configure.
+;; - `:after-completion' lets lsp-mode trigger signature help right after
+;;   a completion; we also call `lsp-signature-activate' explicitly once
+;;   the parens exist, since lsp's own activation fires before our hook.
+(when (modulep! :tools lsp)
+  (add-hook 'company-tng-mode-hook
+            (defun +lsp-snippet-with-tng-h ()
+              (setq lsp-enable-snippet t)))
+  (after! lsp-mode
+    (setq lsp-enable-snippet t)
+    (add-to-list 'lsp-signature-auto-activate :after-completion))
+  (after! company
+    (defun +lsp-insert-function-parens-h (result)
+      "Insert () after accepting an LSP function/method completion RESULT."
+      (when (stringp result)
+        (when-let* ((item (get-text-property 0 'lsp-completion-item result))
+                    (kind (plist-get item :kind))
+                    ((memq kind
+                           (list lsp/completion-item-kind-method
+                                 lsp/completion-item-kind-function
+                                 lsp/completion-item-kind-constructor)))
+                    (data (plist-get item :data))
+                    ((not (plist-get data :funcParensDisabled)))
+                    ;; A server that returns real snippets may already have
+                    ;; written the closing paren; don't add a second pair.
+                    ((not (looking-at-p "\\s)"))))
+          (insert "()")
+          (backward-char 1)
+          (when (and (fboundp 'lsp-signature-activate)
+                     (bound-and-true-p lsp-mode))
+            (lsp-signature-activate)))))
+    (add-hook 'company-after-completion-hook
+              #'+lsp-insert-function-parens-h)))
+
 ;; fix ein 
 (after! ein
   (defun pm--visible-buffer-name ()
