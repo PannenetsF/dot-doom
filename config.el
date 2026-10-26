@@ -1034,8 +1034,8 @@ return nil."
 (defun +python-register-lsp-clients ()
   "Register the Python LSP clients: jedi primary, ty-ls add-on.
 
-jedi owns completion (it returns LSP arg snippets), hover and references;
-ty is a type-checker add-on contributing diagnostics and inlay hints;
+jedi owns completion (it returns LSP arg snippets) and references;
+ty is an add-on contributing diagnostics, inlay hints and hover;
 ruff is lsp-mode's built-in add-on linter/formatter. Idempotent (re-
 registering overwrites by server-id); invoked both after lsp-mode loads
 and at startup so the registrations survive lsp-mode 10's deferred
@@ -1063,10 +1063,15 @@ client-bundle (`lsp--require-packages') reload timing."
     :initialized-fn
     (lambda (workspace)
       (let ((caps (lsp--workspace-server-capabilities workspace)))
-        ;; jedi owns `gr'; don't double up ty's references.
-        (lsp-put caps :referencesProvider nil)
+        ;; Only jedi supplies completion snippets and references. Delete keys:
+        ;; lsp-mode treats a present nil capability as supported (empty {}).
+        ;; Keep ty's diagnostics, hover and inlay hints.
+        (setq caps (lsp-delete caps :completionProvider)
+              caps (lsp-delete caps :referencesProvider))
         (unless (lsp-get caps :inlayHintProvider)
-          (lsp:set-server-capabilities-inlay-hint-provider? caps t)))))))
+          (setq caps (lsp-put caps :inlayHintProvider t)))
+        ;; Deleting the head of a plist returns a new head.
+        (setf (lsp--workspace-server-capabilities workspace) caps))))))
 
 (after! lsp-mode
   ;; Never block on the "watch all files in this huge directory?" yes/no:
