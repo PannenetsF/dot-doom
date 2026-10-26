@@ -976,6 +976,19 @@ return nil."
           (when (and (fboundp 'lsp-signature-activate)
                      (bound-and-true-p lsp-mode))
             (lsp-signature-activate)))))
+    ;; lsp-completion makes `company-after-completion-hook' BUFFER-LOCAL in
+    ;; every LSP buffer (its enable fn adds its own after-completion handler
+    ;; with LOCAL=t). A plain global add-hook then lands only on the default
+    ;; value and never runs in python-ts-mode etc. Register from
+    ;; `lsp-completion-mode-hook' into that same local hook instead.
+    (defun +lsp-add-parens-hook-local-h ()
+      (add-hook 'company-after-completion-hook
+                #'+lsp-insert-function-parens-h nil t))
+    (after! lsp-completion
+      (add-hook 'lsp-completion-mode-hook
+                #'+lsp-add-parens-hook-local-h))
+    ;; Non-LSP buffers keep the global hook (a no-op unless the candidate
+    ;; carries an `lsp-completion-item', which only LSP candidates do).
     (add-hook 'company-after-completion-hook
               #'+lsp-insert-function-parens-h)))
 
