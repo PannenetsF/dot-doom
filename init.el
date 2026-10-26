@@ -173,7 +173,7 @@
        ;;plantuml          ; diagrams for confusing people more
        ;;graphviz          ; diagrams for confusing yourself even more
        ;;purescript        ; javascript, but functional
-       (python +conda +lsp +pyright py-isort +tree-sitter)            ; beautiful is better than ugly
+       (python +conda +lsp py-isort +tree-sitter)            ; beautiful is better than ugly; jedi-language-server registered in config.el (emits LSP arg snippets), ruff is the add-on linter
        ;;qt                ; the 'cutest' gui framework ever
        ;;racket            ; a DSL for DSLs
        ;;raku              ; the artist formerly known as perl6

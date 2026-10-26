@@ -28,6 +28,17 @@
 ;; scanning at it and every subprocess inherits launchd's bare PATH.
 ;; GUI PATH comes from emacs-plus' EMACS_PLUS_PATH (site-start.el),
 ;; terminal Emacs from the shell - install-doom.sh removes any stale file.
+;;
+;; Neither source includes the nix *profile* bin (only the nix-daemon's
+;; /nix/store/...-determinate-nix bin), so nix-installed CLIs such as
+;; jedi-language-server are invisible to `executable-find'/subprocesses in a
+;; GUI session. Append the per-user profile and ~/.nix-profile (homebrew stays
+;; first; these only fill gaps).
+(dolist (dir (list (format "/etc/profiles/per-user/%s/bin" (user-login-name))
+                   (expand-file-name "~/.nix-profile/bin")))
+  (when (and (file-directory-p dir) (not (member dir exec-path)))
+    (setq exec-path (append exec-path (list dir)))
+    (setenv "PATH" (concat (or (getenv "PATH") "") path-separator dir))))
 
 ;; lsp-mode bakes its JSON accessor branch (hash-table vs plist) at
 ;; compile time from $LSP_USE_PLISTS. Doom's package :env only exports
@@ -968,6 +979,11 @@ return nil."
                                  lsp/completion-item-kind-constructor)))
                     (data (plist-get item :data))
                     ((not (plist-get data :funcParensDisabled)))
+                    ;; A snippet-capable server (jedi) expands `f(${1:arg})$0'
+                    ;; via yas: point is already inside that snippet, so adding
+                    ;; a second empty pair would yield `f((arg))'. Stand down.
+                    ((not (and (fboundp 'yas--snippets-at-point)
+                               (yas--snippets-at-point))))
                     ;; A server that returns real snippets may already have
                     ;; written the closing paren; don't add a second pair.
                     ((not (looking-at-p "\\s)"))))
@@ -1007,6 +1023,33 @@ return nil."
     (company-complete-selection))
   (define-key company-tng-map [return] #'+company-tng-ret-complete)
   (define-key company-tng-map (kbd "RET") #'+company-tng-ret-complete))
+
+;; Python LSP: jedi-language-server instead of pyright. pyright emits bare
+;; labels only; jedi returns LSP snippets `f(${1:arg})$0' when the client
+;; advertises snippetSupport, so accepting a function drops a selected arg
+;; placeholder between the parens, and C-j hops through fields / out past `)'
+;; (matching the nvim + UltiSnips setup). The binary comes from PATH (nix
+;; profile), so no extra elisp package is needed. ruff keeps attaching
+;; automatically as lsp-mode's :add-on? diagnostic/formatter server.
+(after! lsp-mode
+  (lsp-register-client
+   (make-lsp-client
+    :new-connection (lsp-stdio-connection
+                     (lambda ()
+                       (cons (or (executable-find "jedi-language-server")
+                                 "jedi-language-server")
+                             nil)))
+    :major-modes '(python-mode python-ts-mode)
+    :server-id 'jedi
+    :priority 1
+    :multi-root t)))
+
+;; C-j / C-k move between yasnippet fields (and out to the `$0' exit point)
+;; while an LSP argument snippet is active. yas-keymap is the overriding map
+;; only during a snippet, so these don't change C-j anywhere else.
+(after! yasnippet
+  (define-key yas-keymap (kbd "C-j") #'yas-next-field-or-maybe-expand)
+  (define-key yas-keymap (kbd "C-k") #'yas-prev-field))
 
 ;; fix ein
 (after! ein
