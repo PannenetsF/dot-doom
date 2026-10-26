@@ -992,7 +992,23 @@ return nil."
     (add-hook 'company-after-completion-hook
               #'+lsp-insert-function-parens-h)))
 
-;; fix ein 
+;; `(company +tng)' unbinds RET in the popup and starts with
+;; `company-selection' = nil (preview-only until you navigate), so a bare RET
+;; hits `company-complete-selection's `(when ... company-selection)' guard and
+;; does nothing -- no completion, no parens. Make RET accept the top candidate
+;; explicitly. Typing any non-completion key (`.', space, ...) still tab-and-go
+;; accepts as before; with no popup, RET is a normal newline.
+(after! company-tng
+  (defun +company-tng-ret-complete ()
+    "Accept the selected (or top) company candidate with RET under TNG."
+    (interactive)
+    (when (null company-selection)
+      (setq company-selection 0))
+    (company-complete-selection))
+  (define-key company-tng-map [return] #'+company-tng-ret-complete)
+  (define-key company-tng-map (kbd "RET") #'+company-tng-ret-complete))
+
+;; fix ein
 (after! ein
   (defun pm--visible-buffer-name ()
     (pm--buffer-name))
