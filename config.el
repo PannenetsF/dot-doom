@@ -1031,7 +1031,15 @@ return nil."
 ;; (matching the nvim + UltiSnips setup). The binary comes from PATH (nix
 ;; profile), so no extra elisp package is needed. ruff keeps attaching
 ;; automatically as lsp-mode's :add-on? diagnostic/formatter server.
-(after! lsp-mode
+(defun +python-register-lsp-clients ()
+  "Register the Python LSP clients: jedi primary, ty-ls add-on.
+
+jedi owns completion (it returns LSP arg snippets), hover and references;
+ty is a type-checker add-on contributing diagnostics and inlay hints;
+ruff is lsp-mode's built-in add-on linter/formatter. Idempotent (re-
+registering overwrites by server-id); invoked both after lsp-mode loads
+and at startup so the registrations survive lsp-mode 10's deferred
+client-bundle (`lsp--require-packages') reload timing."
   (lsp-register-client
    (make-lsp-client
     :new-connection (lsp-stdio-connection
@@ -1042,7 +1050,43 @@ return nil."
     :major-modes '(python-mode python-ts-mode)
     :server-id 'jedi
     :priority 1
-    :multi-root t)))
+    :multi-root t))
+  (require 'lsp-python-ty nil t)
+  (lsp-register-client
+   (make-lsp-client
+    :new-connection (lsp-stdio-connection
+                     (lambda () lsp-python-ty-clients-server-command))
+    :activation-fn (lsp-activate-on "python")
+    :add-on? t
+    :priority -1
+    :server-id 'ty-ls
+    :initialized-fn
+    (lambda (workspace)
+      (let ((caps (lsp--workspace-server-capabilities workspace)))
+        ;; jedi owns `gr'; don't double up ty's references.
+        (lsp-put caps :referencesProvider nil)
+        (unless (lsp-get caps :inlayHintProvider)
+          (lsp:set-server-capabilities-inlay-hint-provider? caps t)))))))
+
+(after! lsp-mode
+  ;; Never block on the "watch all files in this huge directory?" yes/no:
+  ;; answering "no" (skip the recursive watch) is always safe for completion
+  ;; and diagnostics, so auto-decline instead of popping a modal in big repos.
+  (advice-add 'lsp--ask-about-watching-big-repo :override #'ignore)
+  ;; `after! lsp-mode' can fire on a partial load where `lsp-clients' isn't
+  ;; defined yet (that threw "void variable lsp-clients"); the startup hook
+  ;; below re-runs this once lsp is fully loaded.
+  (when (boundp 'lsp-clients)
+    (+python-register-lsp-clients)))
+
+;; Belt-and-suspenders against lsp-mode 10's startup client-table timing:
+;; force lsp loaded and (re)register once the whole init has settled.
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (require 'lsp-mode nil t)
+            (when (boundp 'lsp-clients)
+              (advice-add 'lsp--ask-about-watching-big-repo :override #'ignore)
+              (+python-register-lsp-clients))))
 
 ;; C-j / C-k move between yasnippet fields (and out to the `$0' exit point)
 ;; while an LSP argument snippet is active. yas-keymap is the overriding map
