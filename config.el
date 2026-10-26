@@ -252,39 +252,24 @@ when detection fails or the palette has not changed."
 ;; 1. the which-key delay is set to 0.1 seconds, which means that the key hints
 (setq which-key-idle-delay 0.1)
 
-;; Preheat lazy packages on first idle. Doom defers much of startup to the
-;; first command/first feature use: pyim (the :input chinese module) loads
-;; via `:after-call pre-command-hook', python's conda/pyvenv stack drags in
-;; eshell/tramp with the first python buffer, treemacs (SPC e) and lsp-mode
-;; each cost 0.7-1.1s on first use. Even with native-comp, those require
-;; costs land on a keypress. Loading on the first idle second moves them off
-;; the interaction; running one throwaway Evil motion also warms the lazy
-;; machinery of the first command (evil-goggles/pulse, evil-easymotion,
-;; orderless, company-capf, keymap normalization). vc-git/tramp-gvfs cover
-;; treemacs' buffer-creation path so SPC e is warm end to end.
+;; AOT avoids compilation, not package initialization. The first j/k used to
+;; pay for pyim/liberime and Doom's first-input hooks (1-3s even with .eln).
+;; Initialize that small, always-used set before accepting input instead.
+;; Do not speculate on Python/Treemacs in an idle callback: a single require
+;; can block the main thread for seconds while the user starts typing.
+(defvar +preheat-first-input-done nil)
 (defun +preheat-lazy-packages-h ()
-  (ignore-errors
-    (require 'evil)
+  "Initialize first-input packages once, without executing a fake command."
+  (unless +preheat-first-input-done
     (when (modulep! :input chinese)
       (require 'pyim))
-    (when (modulep! :lang python)
-      (require 'conda)
-      (require 'pyvenv))
-    (when (modulep! :ui treemacs)
-      (require 'treemacs)
-      (require 'vc-git)
-      (require 'tramp-gvfs))
-    (when (modulep! :tools lsp)
-      (require 'lsp-mode))
-    (with-temp-buffer
-      (evil-local-mode 1)
-      (evil-normal-state 1)
-      (evil-normalize-keymaps)
-      (execute-kbd-macro "l"))))
+    ;; Use Doom's dispatcher so errors retain their hook/function context.
+    ;; Clear only after success, like Doom's normal first-input dispatcher.
+    (doom-run-hooks 'doom-first-input-hook)
+    (setq doom-first-input-hook nil
+          +preheat-first-input-done t)))
 
-(add-hook 'emacs-startup-hook
-          (lambda ()
-            (run-with-idle-timer 1 nil #'+preheat-lazy-packages-h)))
+(add-hook 'emacs-startup-hook #'+preheat-lazy-packages-h)
 
 ;; Push xref's marker stack before navigation commands that bypass xref
 ;; (`find-function', `consult-imenu', `consult-ripgrep', `citre-jump'), so
