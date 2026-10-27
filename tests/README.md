@@ -10,6 +10,8 @@ project files. Run from this checkout.
 emacs --batch -Q -l tests/startup-preheat-test.el -f ert-run-tests-batch-and-exit
 emacs --batch -Q -l tests/python-lsp-test.el -f ert-run-tests-batch-and-exit
 emacs --batch -Q -l tests/org-startup-test.el -f ert-run-tests-batch-and-exit
+emacs --batch -Q -l tests/org-latex-preview-test.el -f ert-run-tests-batch-and-exit
+emacs --batch -Q -l tests/chinese-input-test.el -f ert-run-tests-batch-and-exit
 ```
 
 The Python tests macroexpand the deferred registration before loading LSP,

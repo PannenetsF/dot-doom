@@ -90,6 +90,10 @@
 
 (add-hook 'after-setting-font-hook #'private-cjk-font)
 
+;; Doom already enables visual-line-mode in text buffers. Let CJK text wrap
+;; at category boundaries without inserting hard newlines into the file.
+(setq-default word-wrap-by-category t)
+
 (after! doom-modeline
   (setq doom-modeline-bar-width 4
         doom-modeline-mu4e t
@@ -291,6 +295,20 @@ when detection fails or the palette has not changed."
   "Push xref's marker stack before navigation commands that bypass xref."
   :before '(find-function consult-imenu consult-ripgrep citre-jump)
   (xref-push-marker-stack (point-marker)))
+
+(defun +chinese-probe-org-src-block ()
+  "Use English inside Org source blocks without changing prose input."
+  (and (derived-mode-p 'org-mode)
+       (org-in-src-block-p t)))
+
+(after! pyim
+  ;; Reuse pyim's probes rather than adding a second input-method manager.
+  ;; Program comments/strings remain Chinese-capable; prose resumes Chinese
+  ;; automatically when point leaves code or a formula, if pyim is active.
+  (dolist (probe '(pyim-probe-program-mode
+                   +chinese-probe-org-src-block
+                   pyim-probe-org-latex-mode))
+    (add-to-list 'pyim-english-input-switch-functions probe t)))
 
 ;; Rime (liberime) data layout: shared data (default.yaml + luna-pinyin
 ;; schemas, deployed by rime/plum) lives in ~/Library/Rime; per-user state
@@ -788,12 +806,25 @@ return nil."
 
   )
 
+(defun +org-latex-preview-shell-a (fn &rest args)
+  "Keep preview tools on Emacs' PATH instead of reloading Zsh startup files."
+  ;; Org invokes its compiler/converter via shell-command. ~/.zshenv can
+  ;; replace PATH even though executable-find has already found TeX.
+  (let ((shell-file-name "/bin/sh")
+        (shell-command-switch "-c"))
+    (apply fn args)))
+
 (after! org
   ;; for org
   ;; (set-company-backend! 'org-mode 'company-math-symbols-latex 'company-latex-commands '(:separate company-ispell company-dabbrev company-dabbrev-code) 'company-files 'company-capf 'company-yasnippet)
   (set-company-backend! 'org-mode '(company-files company-capf) 'company-math-symbols-latex 'company-latex-commands)
 
-  (plist-put org-format-latex-options :scale 2.5)
+  ;; Use vector images at Org's default scale. Transparent backgrounds also
+  ;; work in quote/block faces.
+  (setq org-preview-latex-default-process 'dvisvgm
+        org-format-latex-options
+        (plist-put org-format-latex-options :background "Transparent"))
+  (advice-add 'org-create-formula-image :around #'+org-latex-preview-shell-a)
 
   (map! :leader
         (:prefix-map ("X" . "Org")
