@@ -20,9 +20,12 @@ def run_once(args, index):
         master, slave = pty.openpty()
         os.set_blocking(master, False)
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
-        env = dict(os.environ, TERM="xterm-256color", DOOM_STARTUP_PROBE_ROOT=tmp)
+        env = dict(os.environ, TERM="xterm-256color", DOOM_STARTUP_PROBE_ROOT=tmp,
+                   DOOM_STARTUP_PROBE_SCENARIO=args.scenario)
         if args.trace:
             env["DOOM_STARTUP_PROBE_TRACE"] = "1"
+        if args.during_init:
+            env["DOOM_STARTUP_PROBE_DURING_INIT"] = "1"
         command = [args.emacs, "-nw", "--init-directory", str(args.init_dir),
                    "-l", str(Path(__file__).with_name("startup-latency-probe.el"))]
         process = subprocess.Popen(command, stdin=slave, stdout=slave, stderr=slave,
@@ -31,6 +34,8 @@ def run_once(args, index):
         started = time.monotonic()
         ready_at = None
         sent = False
+        keys_sent = 0
+        last_sent = 0
         output = bytearray()
         try:
             while time.monotonic() - started < args.timeout:
@@ -45,8 +50,13 @@ def run_once(args, index):
                     ready_at = time.monotonic()
                 if ready_at is not None and not sent:
                     if time.monotonic() - ready_at >= args.idle:
-                        os.write(master, b"jk" * 10)
-                        sent = True
+                        if time.monotonic() - last_sent >= args.input_interval:
+                            (root / f"input-{keys_sent:02d}.json").write_text(
+                                json.dumps(time.time()))
+                            os.write(master, b"j" if keys_sent % 2 == 0 else b"k")
+                            keys_sent += 1
+                            last_sent = time.monotonic()
+                            sent = keys_sent == 20
                 if process.poll() is not None:
                     break
             (root / "terminal.log").write_bytes(output)
@@ -60,6 +70,7 @@ def run_once(args, index):
             if process.returncode or "error" in result:
                 raise RuntimeError(str(result))
             result["run"] = index
+            result["scenario"] = args.scenario
             result["ready_ms"] = round((ready_at - started) * 1000, 2)
             return result
         finally:
@@ -80,15 +91,23 @@ def main():
     parser.add_argument("--init-dir", type=Path,
                         default=Path.home() / ".config/emacs")
     parser.add_argument("--runs", type=int, default=3)
+    parser.add_argument("--scenario", choices=("startup", "python", "org", "treemacs"),
+                        default="startup", help="Exercise first use before j/k")
     parser.add_argument("--idle", type=float, default=0,
                         help="Seconds to wait before sending j/k (test idle timers)")
+    parser.add_argument("--during-init", action="store_true",
+                        help="For Python, type while LSP initializes, not after")
+    parser.add_argument("--input-interval", type=float, default=0,
+                        help="Seconds between individual key events")
     parser.add_argument("--timeout", type=float, default=90)
     parser.add_argument("--max-ms", type=float, default=100)
     parser.add_argument("--trace", action="store_true", help="Trace slow requires")
     parser.add_argument("--output", type=Path, help="Persist JSON evidence")
     args = parser.parse_args()
-    if args.runs < 1 or args.idle < 0:
+    if args.runs < 1 or args.idle < 0 or args.input_interval < 0:
         parser.error("--runs must be positive and --idle nonnegative")
+    if args.during_init and args.scenario != "python":
+        parser.error("--during-init requires --scenario python")
     results = []
     for index in range(1, args.runs + 1):
         result = run_once(args, index)
@@ -96,15 +115,21 @@ def main():
         samples = result["samples"]
         worst = max(sample["ms"] for sample in samples)
         worst_input = max(sample["ms"] for sample in result["input_events"])
+        worst_dispatch = max(sample["dispatch_ms"] for sample in samples)
         print(f"run={index} ready={result['ready_ms']:.1f}ms "
+              f"open={result.get('feature_open_ms', 0):.1f}ms "
               f"first_j={samples[0]['ms']:.3f}ms worst_jk={worst:.3f}ms "
               f"worst_input={worst_input:.3f}ms "
+              f"send_to_post={worst_dispatch:.3f}ms "
               f"slow_requires={len(result['loads'])}", flush=True)
     if args.output:
         args.output.write_text(json.dumps(results, indent=2) + "\n")
     if any(sample["ms"] > args.max_ms
            for result in results for sample in result["input_events"]):
         raise SystemExit("FAIL: input latency exceeds threshold")
+    if any(sample["dispatch_ms"] > args.max_ms
+           for result in results for sample in result["samples"]):
+        raise SystemExit("FAIL: send-to-post latency exceeds threshold")
 
 
 if __name__ == "__main__":

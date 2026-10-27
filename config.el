@@ -427,6 +427,14 @@ when detection fails or the palette has not changed."
 (setq-hook! '+doom-dashboard-mode-hook evil-normal-state-cursor (list nil))
 
 ;; 4. setup org-mode
+(defun +org-prepare-lint-h ()
+  "Load the in-process checker's dependencies before accepting Org input."
+  (when (modulep! :checkers syntax -flymake)
+    ;; Otherwise Flycheck loads the export stack during the first redisplay.
+    (require 'org-lint)
+    (require 'ox-beamer)))
+(add-hook 'org-mode-local-vars-hook #'+org-prepare-lint-h 'append)
+
 (use-package! org
               :defer t
   :config
@@ -491,8 +499,9 @@ when detection fails or the palette has not changed."
                    org-emphasis-regexp-components)
   )
 
-(use-package! org-pomodoro 
-              :after org
+;; Opening an Org buffer need not load timers or their notification backends.
+(use-package! org-pomodoro
+              :commands org-pomodoro
               :config
   (setq org-pomodoro-length 30
         org-pomodoro-short-break-length 5
@@ -538,8 +547,9 @@ when detection fails or the palette has not changed."
   )
 
 
+;; Keep the graph UI on demand; its websocket dependency loads with it.
 (use-package! org-roam-ui
-  :after org-roam ;; or :after org
+  :commands (org-roam-ui-mode org-roam-ui-follow-mode org-roam-ui-open)
   :config
   (setq org-roam-ui-sync-theme t
         org-roam-ui-follow t
@@ -772,12 +782,6 @@ return nil."
               ))
 
   )
-
-;; setup org-roam-ui
-(use-package! websocket
-  :after org-roam)
-
-
 
 (after! org
   ;; for org
@@ -1016,67 +1020,108 @@ return nil."
 ;; (matching the nvim + UltiSnips setup). The binary comes from PATH (nix
 ;; profile), so no extra elisp package is needed. ruff keeps attaching
 ;; automatically as lsp-mode's :add-on? diagnostic/formatter server.
-(defun +python-register-lsp-clients ()
-  "Register the Python LSP clients: jedi primary, ty-ls add-on.
+(after! lsp-mode
+  ;; Quoting prevents eager expansion before LSP's struct setters exist.
+  (eval
+   '(defun +python-register-lsp-clients ()
+      "Register the Python LSP clients: jedi primary, ty-ls add-on.
 
 jedi owns completion (it returns LSP arg snippets) and references;
 ty is an add-on contributing diagnostics, inlay hints and hover;
 ruff is lsp-mode's built-in add-on linter/formatter. Idempotent (re-
-registering overwrites by server-id); invoked both after lsp-mode loads
-and at startup so the registrations survive lsp-mode 10's deferred
-client-bundle (`lsp--require-packages') reload timing."
-  (lsp-register-client
-   (make-lsp-client
-    :new-connection (lsp-stdio-connection
-                     (lambda ()
-                       (cons (or (executable-find "jedi-language-server")
-                                 "jedi-language-server")
-                             nil)))
-    :major-modes '(python-mode python-ts-mode)
-    :server-id 'jedi
-    :priority 1
-    :multi-root t))
-  (require 'lsp-python-ty nil t)
-  (lsp-register-client
-   (make-lsp-client
-    :new-connection (lsp-stdio-connection
-                     (lambda () lsp-python-ty-clients-server-command))
-    :activation-fn (lsp-activate-on "python")
-    :add-on? t
-    :priority -1
-    :server-id 'ty-ls
-    :initialized-fn
-    (lambda (workspace)
-      (let ((caps (lsp--workspace-server-capabilities workspace)))
-        ;; Only jedi supplies completion snippets and references. Delete keys:
-        ;; lsp-mode treats a present nil capability as supported (empty {}).
-        ;; Keep ty's diagnostics, hover and inlay hints.
-        (setq caps (lsp-delete caps :completionProvider)
-              caps (lsp-delete caps :referencesProvider))
-        (unless (lsp-get caps :inlayHintProvider)
-          (setq caps (lsp-put caps :inlayHintProvider t)))
-        ;; Deleting the head of a plist returns a new head.
-        (setf (lsp--workspace-server-capabilities workspace) caps))))))
+registering overwrites by server-id); invoked after lsp-mode loads and
+after its deferred client bundle so the built-in ty client cannot
+overwrite the add-on registration."
+      (lsp-register-client
+       (make-lsp-client
+        :new-connection (lsp-stdio-connection
+                         (lambda ()
+                           (cons (or (executable-find "jedi-language-server")
+                                     "jedi-language-server")
+                                 nil)))
+        :major-modes '(python-mode python-ts-mode)
+        :server-id 'jedi
+        :priority 1
+        :multi-root t))
+      (require 'lsp-python-ty nil t)
+      (lsp-register-client
+       (make-lsp-client
+        :new-connection (lsp-stdio-connection
+                         (lambda () lsp-python-ty-clients-server-command))
+        :activation-fn (lsp-activate-on "python")
+        :add-on? t
+        :priority -1
+        :server-id 'ty-ls
+        :initialized-fn
+        (lambda (workspace)
+          (let ((caps (lsp--workspace-server-capabilities workspace)))
+            ;; Only jedi supplies completion snippets and references. Delete keys:
+            ;; lsp-mode treats a present nil capability as supported (empty {}).
+            ;; Keep ty's diagnostics, hover and inlay hints.
+            (setq caps (lsp-delete caps :completionProvider)
+                  caps (lsp-delete caps :referencesProvider))
+            (unless (lsp-get caps :inlayHintProvider)
+              (setq caps (lsp-put caps :inlayHintProvider t)))
+            ;; Deleting the head of a plist returns a new head.
+            (setf (lsp--workspace-server-capabilities workspace) caps))))))
+   t))
+
+(defvar +python-opening-visible-file nil)
+(defun +python-visible-file-a (fn &rest args)
+  "Distinguish opening a file for editing from background buffer restoration."
+  (let ((+python-opening-visible-file t)) (apply fn args)))
+(advice-add 'find-file :around #'+python-visible-file-a)
+
+(defun +python-prepare-lsp-checker-h ()
+  "Avoid starting an external checker just to kill it when LSP initializes."
+  (when (and (bound-and-true-p lsp--buffer-workspaces)
+             lsp-auto-configure
+             (modulep! :checkers syntax -flymake)
+             (not (bound-and-true-p flycheck-checker)))
+    (require 'flycheck)
+    (require 'lsp-diagnostics)
+    (when (and (memq lsp-diagnostics-provider '(:auto :flycheck nil))
+               (not (memq major-mode lsp-diagnostics-disabled-modes)))
+      (lsp-flycheck-add-mode major-mode)
+      (setq-local flycheck-checker 'lsp))))
+
+(defun +python-start-lsp-h ()
+  "Initialize an explicitly opened Python file before accepting commands."
+  (unless (bound-and-true-p lsp-mode)
+    (if (or +python-opening-visible-file (get-buffer-window (current-buffer) t))
+        (progn
+          (when (modulep! :editor snippets) (require 'yasnippet))
+          (lsp)
+          (+python-prepare-lsp-checker-h))
+      (lsp-deferred))))
+
+(after! python
+  (when (and (modulep! :lang python +lsp) (modulep! :tools lsp -eglot))
+    (dolist (hook '(python-mode-local-vars-hook python-ts-mode-local-vars-hook))
+      (remove-hook hook #'lsp!)
+      (add-hook hook #'+python-start-lsp-h 'append))))
+
+(defun +python-load-lsp-client-bundle-a (fn &rest args)
+  "Load only Python clients here, leaving the global bundle for other modes."
+  (if (and (derived-mode-p 'python-mode 'python-ts-mode)
+           (not lsp--client-packages-required))
+      (let ((lsp-client-packages '(lsp-python-ty lsp-ruff))
+            (lsp--client-packages-required nil))
+        (apply fn args))
+    (apply fn args)))
 
 (after! lsp-mode
   ;; Never block on the "watch all files in this huge directory?" yes/no:
   ;; answering "no" (skip the recursive watch) is always safe for completion
   ;; and diagnostics, so auto-decline instead of popping a modal in big repos.
   (advice-add 'lsp--ask-about-watching-big-repo :override #'ignore)
-  ;; `after! lsp-mode' can fire on a partial load where `lsp-clients' isn't
-  ;; defined yet (that threw "void variable lsp-clients"); the startup hook
-  ;; below re-runs this once lsp is fully loaded.
+  ;; lsp loads its client bundle before selecting servers. Reapply our
+  ;; registrations there, not at Emacs startup (which forced all of LSP/UI
+  ;; into every session, including sessions that never open code).
+  (advice-add 'lsp--require-packages :around #'+python-load-lsp-client-bundle-a)
+  (advice-add 'lsp--require-packages :after #'+python-register-lsp-clients)
   (when (boundp 'lsp-clients)
     (+python-register-lsp-clients)))
-
-;; Belt-and-suspenders against lsp-mode 10's startup client-table timing:
-;; force lsp loaded and (re)register once the whole init has settled.
-(add-hook 'emacs-startup-hook
-          (lambda ()
-            (require 'lsp-mode nil t)
-            (when (boundp 'lsp-clients)
-              (advice-add 'lsp--ask-about-watching-big-repo :override #'ignore)
-              (+python-register-lsp-clients))))
 
 ;; C-j / C-k move between yasnippet fields (and out to the `$0' exit point)
 ;; while an LSP argument snippet is active. yas-keymap is the overriding map
