@@ -33,8 +33,13 @@
 ;; /nix/store/...-determinate-nix bin), so nix-installed CLIs such as
 ;; jedi-language-server are invisible to `executable-find'/subprocesses in a
 ;; GUI session. Append the per-user profile and ~/.nix-profile (homebrew stays
-;; first; these only fill gaps).
-(dolist (dir (list (format "/etc/profiles/per-user/%s/bin" (user-login-name))
+;; first; these only fill gaps). MacTeX's /Library/TeX/texbin shim is also a
+;; new prefix: EMACS_PLUS_PATH is baked into emacs-plus at bottling time and
+;; does not gain it when the cask is installed later, and launchd-started
+;; Emacs never reads /etc/paths.d, so org LaTeX preview (xelatex +
+;; preview.sty + dvisvgm) would find no compiler without this.
+(dolist (dir (list "/Library/TeX/texbin"
+                   (format "/etc/profiles/per-user/%s/bin" (user-login-name))
                    (expand-file-name "~/.nix-profile/bin")))
   (when (and (file-directory-p dir) (not (member dir exec-path)))
     (setq exec-path (append exec-path (list dir)))
