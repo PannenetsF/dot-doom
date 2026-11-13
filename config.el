@@ -221,6 +221,10 @@ when detection fails or the palette has not changed."
 ;; numbers are disabled. For relative line numbers, set this to `relative'.
 (setq display-line-numbers-type 'relative)
 
+;; This Doom version enables line numbers from text-mode-hook and has no
+;; +line-numbers-disabled-modes list. Disable them after that for Org only.
+(add-hook 'org-mode-hook (lambda () (display-line-numbers-mode -1)))
+
 
 
 ;; Whenever you reconfigure a package, make sure to wrap your config in an
