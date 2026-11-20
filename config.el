@@ -284,6 +284,15 @@ when detection fails or the palette has not changed."
 
 (add-hook 'emacs-startup-hook #'+preheat-lazy-packages-h)
 
+;; Doom defers `save-place-mode' to `doom-first-input-hook', which the preheat
+;; above only runs from `emacs-startup-hook'. Files passed on the command line
+;; (`emacs file', Finder "Open with") are visited earlier, in `command-line-1',
+;; so their saved point is never restored. Enable it at init instead. Remove
+;; Doom's hook entry: called with no argument the minor-mode command toggles,
+;; and the preheat dispatcher would switch it back off.
+(save-place-mode 1)
+(remove-hook 'doom-first-input-hook #'save-place-mode)
+
 ;; Push xref's marker stack before navigation commands that bypass xref
 ;; (`find-function', `consult-imenu', `consult-ripgrep', `citre-jump'), so
 ;; `M-,' (`xref-pop-marker-stack') can return from them. xref's own
